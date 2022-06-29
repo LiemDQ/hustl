@@ -1,0 +1,36 @@
+[package]
+name = "vuestl"
+version = "0.1.0"
+edition = "2021"
+authors = ["Liem Dam-Quang <liem.daq@gmail.com"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+wgpu = "0.12"
+nalgebra-glm = "0.17.0"
+clap = {version = "3.1", features = ["derive"]}
+winit = "0.26.1"
+env_logger = "0.9"
+log = "0.4"
+nom = "7"
+byteorder = "1.4.3"
+pollster = "0.2.4"
+cfg-if = "1"
+bytemuck = {version = "1.5", features = ["derive"]}
+anyhow = "1.0"
+
+[target.'cfg(target_arch="wasm32")'.dependencies]
+console_error_panic_hook = "0.1.7"
+console_log = "0.2.0"
+wgpu = {version = "0.12", features = ["webgl"]}
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4.30"
+web-sys = {version = "0.3", features = [
+    "Document",
+    "Window",
+    "Element",
+]}
+
+# [lib]
+# crate-type = ["cdylib", "bin"]
