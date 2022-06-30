@@ -26,8 +26,8 @@ pub struct Vertex {
 pub struct Model {
     vertex_buf: wgpu::Buffer,
     index_buf: wgpu::Buffer,
-    uniform_buf: wgpu::Buffer,
-    bind_group: wgpu::BindGroup,
+    // uniform_buf: wgpu::Buffer,
+    // bind_group: wgpu::BindGroup,
     render_pipeline: wgpu::RenderPipeline,
     num_indices: u32,
 }

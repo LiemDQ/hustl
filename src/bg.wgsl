@@ -14,13 +14,13 @@ fn vs_main([[builtin(vertex_index)]] in_vertex_index: u32) -> VertexOutput {
     if (in_vertex_index == 0u || in_vertex_index == 5u) {
         out.color = c1;
         out.position = vec4<f32>(-1.0, -1.0, 0.0, 1.0);
-    } elseif (in_vertex_index == 1u) {
+    } else if (in_vertex_index == 1u) {
         out.color = c1;
         out.position = vec4<f32>(1.0, -1.0, 0.0, 1.0);
-    } elseif (in_vertex_index == 2u || in_vertex_index == 3u) {
+    } else if (in_vertex_index == 2u || in_vertex_index == 3u) {
         out.color = c2;
         out.position = vec4<f32>(1.0, 1.0, 0.0, 1.0);
-    } elseif (in_vertex_index == 4u) {
+    } else if (in_vertex_index == 4u) {
         out.color = c2;
         out.position = vec4<f32>(-1.0, 1.0, 0.0, 1.0);
     } else {

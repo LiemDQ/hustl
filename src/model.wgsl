@@ -3,7 +3,10 @@ struct VertexOutput {
     [[location(0)]] normal: vec4<f32>,
 };
 
-
+[[stage(vertex)]]
+fn vs_main(){
+    
+}
 
 [[stage(fragment)]]
 fn fs_main() {

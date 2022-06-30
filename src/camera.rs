@@ -10,19 +10,20 @@ enum MouseState {
 }
 
 pub struct Camera {
-    width: f64,
-    height: f64,
-    pitch: f64,
-    yaw: f64,
-    scale: f64,
+    width: f32,
+    height: f32,
+    pitch: f32,
+    yaw: f32,
+    scale: f32,
     center: Vec3,
     mouse: MouseState,
 }
 
 impl Camera {
-    pub fn new(width: f64, height: f64) -> Self {
+    pub fn new(width: f32, height: f32) -> Self {
         Self {
-            width, height,
+            width, 
+            height,
             pitch: 0.0,
             yaw: 0.0,
             scale: 1.0,
@@ -31,15 +32,26 @@ impl Camera {
         }
     }
 
-    pub fn set_size(&mut self) {
-
+    pub fn set_size(&mut self, width: f32, height: f32) {
+        self.width = width;
+        self.height = height;
     }
-
+    
+    /// Returns a matrix which compensates for window aspect ratio and clipping
     pub fn view_matrix(&self) -> Mat4 {
+        let i = Mat4::identity();
+        
+        // The Z clipping range is 0-1
+        glm::translate(&i, &Vec3::new(0.0, 0.0, 0.5))*
+        //scale to compensate for aspect ratio and reduce Z scale to improve clipping
+        glm::scale(&i, &Vec3::new(1.0, self.width/ self.height, 0.1))
 
     }
 
     pub fn model_matrix(&self) -> Mat4 {
+        let i = Mat4::identity();
 
+        glm::scale(&i, &Vec3::new(self.scale, self.scale, self.scale)) 
+        * glm::rotate_x(&i, self.yaw) * glm::rotate_y(&i,self.pitch)*glm::translate(&i, &-self.center)
     }
 }
