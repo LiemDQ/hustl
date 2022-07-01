@@ -1,5 +1,4 @@
-
-mod parser; 
+mod loader; 
 mod model;
 mod camera;
 mod bg;
