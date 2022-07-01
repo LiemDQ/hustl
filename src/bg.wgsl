@@ -1,5 +1,6 @@
 // Taken from Foxtrot GUI crate.
 // https://github.com/Formlabs/foxtrot/blob/master/gui/src/backdrop.wgsl
+//this shader allows us to achieve a nice color gradient in the background.
 
 struct VertexOutput {
     [[location(0)]] color: vec4<f32>;
