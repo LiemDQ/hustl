@@ -18,6 +18,9 @@ impl Model {
     pub fn new(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration, vertices: &[Vertex], indices: &[u32]) -> Self {
         
         let num_vertices = vertices.len() as u32;
+        println!("{}", num_vertices);
+
+        println!("{:?}", vertices);
 
         let vertex_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor{
@@ -48,7 +51,7 @@ impl Model {
                 entries: &[
                     wgpu::BindGroupLayoutEntry {
                         binding: 0,
-                        visibility: wgpu::ShaderStages::VERTEX,
+                        visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
                         ty: wgpu::BindingType::Buffer { 
                             ty: wgpu::BufferBindingType::Uniform, 
                             has_dynamic_offset: false, 
@@ -134,7 +137,7 @@ impl Model {
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: wgpu::TextureFormat::Depth32Float,
                     depth_write_enabled: true,
-                    depth_compare: wgpu::CompareFunction::Less,
+                    depth_compare: wgpu::CompareFunction::Greater,
                     stencil: wgpu::StencilState::default(),
                     bias: wgpu::DepthBiasState::default(),
                 }),
@@ -168,6 +171,9 @@ impl Model {
         let view_matrix = camera.view_matrix();
         let model_matrix = camera.model_matrix();
         let proj_matrix = camera.proj_matrix();
+        // println!("View matrix: {}", view_matrix);
+        // println!("Model matrix: {}", model_matrix);
+        // println!("Proj matrix: {}", proj_matrix);
         queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(view_matrix.as_slice()));
         queue.write_buffer(&self.camera_buffer, 
             std::mem::size_of::<Mat4>() as wgpu::BufferAddress, 
@@ -182,12 +188,12 @@ impl Model {
         
         let mut render_pass = encoder.begin_render_pass(
             &wgpu::RenderPassDescriptor {
-                label: None,
+                label: Some("Model render pass"),
                 color_attachments: &[wgpu::RenderPassColorAttachment {
                     view: &view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::GREEN),
+                        load: wgpu::LoadOp::Load,
                         store: true,
                     }
                 }],
@@ -195,7 +201,7 @@ impl Model {
                     wgpu::RenderPassDepthStencilAttachment {
                         view: &depth_view,
                         depth_ops: Some(wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(0.0),
+                            load: wgpu::LoadOp::Load,
                             store: true
                         }),
                         stencil_ops: None,

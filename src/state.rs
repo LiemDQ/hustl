@@ -1,6 +1,8 @@
 
+use nalgebra_glm::Vec2;
 use wgpu::Queue;
 use winit::dpi::PhysicalSize;
+use winit::event::{DeviceEvent, MouseScrollDelta, WindowEvent, ElementState};
 
 use crate::camera::Camera;
 use crate::loader::Loader;
@@ -16,6 +18,7 @@ pub struct State {
     pub size: PhysicalSize<u32>,
     background: Background,
     depth: (wgpu::Texture, wgpu::TextureView, wgpu::Sampler),
+    is_first_frame: bool,
 }
 
 impl State {
@@ -51,7 +54,8 @@ impl State {
             model,
             size,
             depth,
-            background
+            background,
+            is_first_frame: true
         }
     }
 
@@ -61,6 +65,7 @@ impl State {
         self.config.height = size.height;
         self.surface.configure(&self.device, &self.config);
         self.depth = Model::get_depth_texture(&self.config, &self.device);
+        self.camera.set_size(size.width as f32, size.height as f32);
     }
 
     pub fn render(&mut self, queue: &wgpu::Queue) -> Result<(), wgpu::SurfaceError> {
@@ -71,17 +76,53 @@ impl State {
         if let Some(model) = &self.model {
             model.draw(&self.camera, &frame, &self.depth.1, &mut encoder, &queue);
         }
+
+        if self.model.is_some() && self.is_first_frame {
+            let end = std::time::SystemTime::now();
+            let dt = end.duration_since(self.start_time).expect("Negative startup time calculated?!");
+            println!("First redraw in {:?}", dt);
+            self.is_first_frame = false;
+        }
+        
         queue.submit(std::iter::once(encoder.finish()));
         frame.present();
+
+        if self.is_first_frame {
+            self.is_first_frame = false;
+        }
         
         Ok(())
     }
 
-    pub fn device_event() {
-
+    pub fn device_event(&mut self, e: &DeviceEvent) {
+        if let DeviceEvent::MouseWheel { delta } = e {
+            if let MouseScrollDelta::PixelDelta(p) = delta {
+                self.camera.mouse_scroll(p.y as f32);
+            }
+        }
     }
 
-    pub fn window_event() {
+    pub fn window_event(&mut self, e: &WindowEvent) -> bool {
+        match e {
+            WindowEvent::MouseInput { state, button, .. } => {
+                match state {
+                    ElementState::Pressed => self.camera.mouse_pressed(*button),
+                    ElementState::Released => self.camera.mouse_released(*button),
+                }
+                true
+            },
+            WindowEvent::CursorMoved { position, .. } => {
+                self.camera.mouse_move(Vec2::new(position.x as f32, position.y as f32));
+                true
+            },
+            WindowEvent::MouseWheel { delta, .. } => {
+                if let MouseScrollDelta::LineDelta(_, verti) = delta {
+                    self.camera.mouse_scroll(verti*10.0);
+                }
+                true
+            }
+            _ => false,
+        }
 
     }
 

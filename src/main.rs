@@ -52,21 +52,25 @@ async fn run(start_time: SystemTime, filename: Option<String>, event_loop: Event
         match event {
             Event::WindowEvent { window_id, ref event} if window_id == window.id() => {
                 //handle events here
-                match event {
-                    WindowEvent::CloseRequested | WindowEvent::KeyboardInput { 
-                        input: KeyboardInput { 
-                            state: ElementState::Pressed, 
-                            virtual_keycode: Some(VirtualKeyCode::Escape), //placeholder quit button
-                            ..
-                        }, .. 
-                    } => *control_flow = ControlFlow::Exit,
-                    WindowEvent::Resized(physical_size) => {
-                        state.resize(*physical_size);
-                    },
-                    WindowEvent::ScaleFactorChanged {new_inner_size, .. } => {
-                        state.resize(**new_inner_size);
+                if !state.window_event(event) {
+                    match event {
+                        WindowEvent::CloseRequested | WindowEvent::KeyboardInput { 
+                            input: KeyboardInput { 
+                                state: ElementState::Pressed, 
+                                virtual_keycode: Some(VirtualKeyCode::Escape), //placeholder quit button
+                                ..
+                            }, .. 
+                        } => *control_flow = ControlFlow::Exit,
+                        WindowEvent::Resized(physical_size) => {
+                            state.resize(*physical_size);
+                        },
+                        WindowEvent::ScaleFactorChanged {new_inner_size, .. } => {
+                            state.resize(**new_inner_size);
+                        }
+                        _ => {},
                     }
-                    _ => {},
+                } else {
+                    window.request_redraw();
                 }
             }, 
             Event::RedrawRequested(window_id) if window_id == window.id() => {
@@ -80,6 +84,7 @@ async fn run(start_time: SystemTime, filename: Option<String>, event_loop: Event
             Event::MainEventsCleared => {
                 window.request_redraw();
             },
+            Event::DeviceEvent { event,.. } => state.device_event(&event),
             // Event::DeviceEvent { event, ..} => state.
             _ => {},
         }
