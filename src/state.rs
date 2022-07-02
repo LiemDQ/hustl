@@ -80,7 +80,7 @@ impl State {
         if self.model.is_some() && self.is_first_frame {
             let end = std::time::SystemTime::now();
             let dt = end.duration_since(self.start_time).expect("Negative startup time calculated?!");
-            println!("First redraw in {:?}", dt);
+            println!("First render in {:?}", dt);
             self.is_first_frame = false;
         }
         

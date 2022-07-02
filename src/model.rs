@@ -18,9 +18,9 @@ impl Model {
     pub fn new(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration, vertices: &[Vertex], indices: &[u32]) -> Self {
         
         let num_vertices = vertices.len() as u32;
-        println!("{}", num_vertices);
+        println!("Polygons: {}", num_vertices/3);
 
-        println!("{:?}", vertices);
+        // println!("{:?}", vertices);
 
         let vertex_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor{
@@ -171,9 +171,9 @@ impl Model {
         let view_matrix = camera.view_matrix();
         let model_matrix = camera.model_matrix();
         let proj_matrix = camera.proj_matrix();
-        // println!("View matrix: {}", view_matrix);
-        // println!("Model matrix: {}", model_matrix);
-        // println!("Proj matrix: {}", proj_matrix);
+        println!("View matrix: {}", view_matrix);
+        println!("Model matrix: {}", model_matrix);
+        println!("Proj matrix: {}", proj_matrix);
         queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(view_matrix.as_slice()));
         queue.write_buffer(&self.camera_buffer, 
             std::mem::size_of::<Mat4>() as wgpu::BufferAddress, 

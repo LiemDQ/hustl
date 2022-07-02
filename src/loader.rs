@@ -43,21 +43,27 @@ impl Loader {
 
         //TODO: enable multithreading
         let body = &bytestream[84..];
-        let body_iter = body.chunks(50); 
+        
         // let mut triangle_data = Vec::new();
         let mut vertex_data = Vec::with_capacity(num_triangles as usize*3);
         let mut indices = Vec::with_capacity(num_triangles as usize *3);
-
-        for (i,vertex_vals) in body_iter.enumerate() {
-            let mut vertex = Vertex {pos: [0.0;3]}; //initialized to 0 before filling. If this affects performance significantly can use unsafe initialization instead. 
-
-            for (mut data, val) in vertex_vals.chunks(4).zip(vertex.pos.iter_mut()) {
-                *val = data.read_f32::<LittleEndian>().unwrap();
-                //last 2 bytes are the "attribute byte count" and are ignored.
+        let i = 0;
+        //loop over every 50 chunks. The first 36 bytes are vertex data. 
+        for triangle_data in body.chunks(50) {
+            for n in 1..4 {
+                let mut vertex = Vertex {pos: [0.0;3]};
+                for (mut data, val) in triangle_data.chunks(4).skip(n*3).zip(vertex.pos.iter_mut()) {
+                    *val = data.read_f32::<LittleEndian>().unwrap();
+                }
+                vertex_data.push(vertex);
+                indices.push(i as u32);
             }
-            vertex_data.push(vertex);
-            indices.push(i as u32);
+
+            //last 2 bytes are the "attribute byte count" and are ignored.
         }
+
+        // println!("{:?}", vertex_data);
+        // println!("{}", indices.last().unwrap());
 
         (vertex_data, indices)
     }
