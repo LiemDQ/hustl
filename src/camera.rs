@@ -9,14 +9,32 @@ enum MouseState {
     Pan(Vec2, Vec3),
 }
 
+enum Projection {
+    Orthographic,
+    Perspective,
+}
+
+impl Projection {
+    pub fn get_coefficient(&self) -> f32 {
+        match self {
+            Self::Orthographic => 0.0,
+            Self::Perspective => 0.5,
+        }
+    }
+}
+
+/// Uses the arcball method of rotations with the mouse.
 pub struct Camera {
     width: f32,
     height: f32,
+    //pitch as euler angle
     pitch: f32,
+    //yaw as euler angle
     yaw: f32,
     scale: f32,
     center: Vec3,
     mouse: MouseState,
+    projection_type: Projection,
 }
 
 impl Camera {
@@ -29,8 +47,10 @@ impl Camera {
             scale: 1.0,
             center: Vec3::zeros(),
             mouse: MouseState::Unknown,
+            projection_type: Projection::Orthographic,
         }
     }
+
 
     pub fn set_size(&mut self, width: f32, height: f32) {
         self.width = width;
@@ -54,4 +74,19 @@ impl Camera {
         glm::scale(&i, &Vec3::new(self.scale, self.scale, self.scale)) 
         * glm::rotate_x(&i, self.yaw) * glm::rotate_y(&i,self.pitch)*glm::translate(&i, &-self.center)
     }
+
+    pub fn proj_matrix(&self) -> Mat4 {
+        const ROW: usize = 4;
+        let mut mat = Mat4::identity();
+        let aspect_ratio = self.width/self.height;
+        if aspect_ratio > 1.0 {
+            mat[0] = 1.0/aspect_ratio;
+        } else {
+            mat[ROW*1+1] = aspect_ratio;
+        }
+        mat[ROW*2+2] = self.scale / 2.0;
+        mat[ROW*2+3] = self.projection_type.get_coefficient();
+        mat
+    }
+
 }

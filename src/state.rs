@@ -1,7 +1,9 @@
+
 use wgpu::Queue;
 use winit::dpi::PhysicalSize;
 
 use crate::camera::Camera;
+use crate::loader::Loader;
 use crate::model::Model;
 use crate::bg::Background;
 pub struct State {
@@ -17,10 +19,9 @@ pub struct State {
 }
 
 impl State {
-    pub fn new(start_time: std::time::SystemTime, size: PhysicalSize<u32>, 
+    pub fn new(start_time: std::time::SystemTime, filename: Option<String>, size: PhysicalSize<u32>, 
             adapter: wgpu::Adapter, surface: wgpu::Surface, device: wgpu::Device) -> Self {
         
-            
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface.get_preferred_format(&adapter).unwrap(),
@@ -28,9 +29,18 @@ impl State {
             height: size.height,
             present_mode: wgpu::PresentMode::Fifo,
         };
+        let model = if let Some(filename) = filename {
+            let loader = Loader{filename: filename};
+            let data = loader.parse_binary();
+            Some(Model::new(&device, &config, data.0.as_slice(), data.1.as_slice()))
+        } else {
+            None
+        };
+            
         surface.configure(&device, &config);
         let background = Background::new(&device, &config);
-        let depth = Background::get_depth_texture(&config, &device);
+        let depth = Model::get_depth_texture(&config, &device);
+
         
         Self { 
             start_time, 
@@ -38,7 +48,7 @@ impl State {
             config,
             device,
             camera: Camera::new(size.width as f32, size.height as f32), 
-            model: None,
+            model,
             size,
             depth,
             background
@@ -49,16 +59,17 @@ impl State {
         self.size = size;
         self.config.width = size.width;
         self.config.height = size.height;
-        self.depth = Background::get_depth_texture(&self.config, &self.device);
+        self.surface.configure(&self.device, &self.config);
+        self.depth = Model::get_depth_texture(&self.config, &self.device);
     }
 
-    pub fn redraw(&mut self, queue: &wgpu::Queue) -> Result<(), wgpu::SurfaceError> {
+    pub fn render(&mut self, queue: &wgpu::Queue) -> Result<(), wgpu::SurfaceError> {
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor{ label: None});
         let frame = self.surface.get_current_texture()?;
         
         self.background.draw(&frame, &self.depth.1, &mut encoder)?;
         if let Some(model) = &self.model {
-
+            model.draw(&self.camera, &frame, &self.depth.1, &mut encoder, &queue);
         }
         queue.submit(std::iter::once(encoder.finish()));
         frame.present();
