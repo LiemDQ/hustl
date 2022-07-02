@@ -16,10 +16,10 @@ use crate::state::State;
 
 #[derive(clap::Parser)]
 struct Args {
-    filename: String
+    filename: Option<String>
 }
 
-async fn run(start_time: SystemTime, event_loop: EventLoop<()>, window: Window) {
+async fn run(start_time: SystemTime, filename: Option<String>, event_loop: EventLoop<()>, window: Window) {
     let size = window.inner_size();
     let instance = wgpu::Instance::new(wgpu::Backends::all());
     let surface = unsafe { instance.create_surface(&window)};
@@ -45,7 +45,7 @@ async fn run(start_time: SystemTime, event_loop: EventLoop<()>, window: Window) 
             None
         ).await.unwrap();
 
-    let mut state = State::new(start_time, size, adapter, surface, device);
+    let mut state = State::new(start_time, filename, size, adapter, surface, device);
 
     event_loop.run(move |event, _, control_flow|  {
         *control_flow = ControlFlow::Wait;
@@ -60,11 +60,17 @@ async fn run(start_time: SystemTime, event_loop: EventLoop<()>, window: Window) 
                             ..
                         }, .. 
                     } => *control_flow = ControlFlow::Exit,
+                    WindowEvent::Resized(physical_size) => {
+                        state.resize(*physical_size);
+                    },
+                    WindowEvent::ScaleFactorChanged {new_inner_size, .. } => {
+                        state.resize(**new_inner_size);
+                    }
                     _ => {},
                 }
             }, 
             Event::RedrawRequested(window_id) if window_id == window.id() => {
-                match state.redraw(&queue) {
+                match state.render(&queue) {
                     Ok(_) => {},
                     Err(wgpu::SurfaceError::Lost) => state.resize(state.size),
                     Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
@@ -90,10 +96,10 @@ fn main() {
             env_logger::init();
         }
     }
-    // let args = Args::parse();
+    let args = Args::parse();
 
     let event_loop = EventLoop::new();
     let window = Window::new(&event_loop).unwrap();
     window.set_title("Vuestl");
-    pollster::block_on(run(start, event_loop, window));
+    pollster::block_on(run(start, args.filename, event_loop, window));
 }
