@@ -1,6 +1,5 @@
 
 use nalgebra_glm::Vec2;
-use wgpu::Queue;
 use winit::dpi::PhysicalSize;
 use winit::event::{DeviceEvent, MouseScrollDelta, WindowEvent, ElementState};
 
@@ -33,7 +32,7 @@ impl State {
             present_mode: wgpu::PresentMode::Fifo,
         };
         let model = if let Some(filename) = filename {
-            let loader = Loader{filename: filename};
+            let loader = Loader::new(filename);
             let data = loader.parse_binary();
             Some(Model::new(&device, &config, data.0.as_slice(), data.1.as_slice()))
         } else {

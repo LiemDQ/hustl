@@ -1,6 +1,6 @@
 use std::{fs, hash::Hash};
 use byteorder::{LittleEndian, ReadBytesExt};
-use std::collections::HashMap;
+use fxhash::FxHashMap;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -10,16 +10,29 @@ pub struct Vertex {
 
 impl PartialEq for Vertex {
     fn eq(&self, other: &Self) -> bool {
-        false
+        self.pos[0] == other.pos[0] && self.pos[1] == other.pos[1] && self.pos[2] == other.pos[2]
+    }
+}
+
+impl Eq for Vertex {}
+
+impl Hash for Vertex {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        state.write_u32(bytemuck::cast::<f32, u32>(self.pos[0]));
+        state.write_u32(bytemuck::cast::<f32, u32>(self.pos[1]));
+        state.write_u32(bytemuck::cast::<f32, u32>(self.pos[2]));
     }
 }
 
 pub struct Loader {
     pub filename: String,
-    // pub vertex_set: HashMap<Vertex, usize>
+    pub vertex_map: FxHashMap<Vertex, usize>
 }
 
 impl Loader {
+    pub fn new(filename: String) -> Self {
+        Self { filename, vertex_map: FxHashMap::default() }
+    }
 
     fn parse_ascii(&self) -> Vec<Vertex> {
         let stream = fs::read_to_string(&self.filename).unwrap();
@@ -47,25 +60,39 @@ impl Loader {
         // let mut triangle_data = Vec::new();
         let mut vertex_data = Vec::with_capacity(num_triangles as usize*3);
         let mut indices = Vec::with_capacity(num_triangles as usize *3);
-        let i = 0;
+        let mut i = 0;
         //loop over every 50 chunks. The first 36 bytes are vertex data. 
-        for triangle_data in body.chunks(50) {
+        body.chunks(50).map(|chunk| {
+            
             for n in 1..4 {
                 let mut vertex = Vertex {pos: [0.0;3]};
-                for (mut data, val) in triangle_data.chunks(4).skip(n*3).zip(vertex.pos.iter_mut()) {
+                for (mut data, val) in chunk.chunks(4).skip(n*3).zip(vertex.pos.iter_mut()) {
                     *val = data.read_f32::<LittleEndian>().unwrap();
                 }
+                
                 vertex_data.push(vertex);
                 indices.push(i as u32);
+                i += 1;
             }
-
-            //last 2 bytes are the "attribute byte count" and are ignored.
-        }
+           //last 2 bytes are the "attribute byte count" and are ignored.
+            
+        }).collect();
 
         // println!("{:?}", vertex_data);
         // println!("{}", indices.last().unwrap());
 
         (vertex_data, indices)
+    }
+
+    fn insert_into_map(&mut self, vertex: Vertex, vector: &mut Vec<Vertex>) -> usize {
+        if self.vertex_map.contains_key(&vertex) {
+            *self.vertex_map.get(&vertex).unwrap()
+        } else {
+            vector.push(vertex);
+            let idx = vector.len() -1;
+            self.vertex_map.insert(vertex, idx);
+            idx
+        }
     }
 
     
