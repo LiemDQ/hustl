@@ -13,6 +13,8 @@ use winit::{
 use clap::Parser;
 
 use crate::state::State;
+use crate::loader::Loader;
+use crate::model::Model;
 
 #[derive(clap::Parser)]
 struct Args {
@@ -31,7 +33,16 @@ async fn run(start_time: SystemTime, filename: Option<String>, event_loop: Event
         }
     ).await.unwrap();
 
-    let (device, queue) = adapter
+    let config = wgpu::SurfaceConfiguration {
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+        format: surface.get_preferred_format(&adapter).unwrap(),
+        width: size.width,
+        height: size.height,
+        present_mode: wgpu::PresentMode::Fifo,
+    };
+    
+
+    let adapter_request = adapter
         .request_device(
             &wgpu::DeviceDescriptor {
                 label: None,
@@ -43,9 +54,19 @@ async fn run(start_time: SystemTime, filename: Option<String>, event_loop: Event
                 },
             }, 
             None
-        ).await.unwrap();
+        );
 
-    let mut state = State::new(start_time, filename, size, adapter, surface, device);
+    let (model, device, queue) = if let Some(filename) = filename {
+        let mut loader = Loader::new(filename);
+        let data = loader.parse_binary();
+        let (device, queue) = adapter_request.await.unwrap();
+        (Some(Model::new(&device, &config, data.0.as_slice(), data.1.as_slice())), device, queue)
+    } else {
+        let (device, queue) = adapter_request.await.unwrap();
+        (None, device, queue)
+    };
+
+    let mut state = State::new(start_time, model, size, adapter, surface, device, config);
 
     event_loop.run(move |event, _, control_flow|  {
         *control_flow = ControlFlow::Wait;
@@ -105,6 +126,6 @@ fn main() {
 
     let event_loop = EventLoop::new();
     let window = Window::new(&event_loop).unwrap();
-    window.set_title("Vuestl");
+    window.set_title("hustl");
     pollster::block_on(run(start, args.filename, event_loop, window));
 }

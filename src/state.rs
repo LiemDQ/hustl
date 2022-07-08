@@ -21,23 +21,10 @@ pub struct State {
 }
 
 impl State {
-    pub fn new(start_time: std::time::SystemTime, filename: Option<String>, size: PhysicalSize<u32>, 
-            adapter: wgpu::Adapter, surface: wgpu::Surface, device: wgpu::Device) -> Self {
+    pub fn new(start_time: std::time::SystemTime, model: Option<Model>, size: PhysicalSize<u32>, 
+            adapter: wgpu::Adapter, surface: wgpu::Surface, device: wgpu::Device, config: wgpu::SurfaceConfiguration) -> Self {
         
-        let config = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: surface.get_preferred_format(&adapter).unwrap(),
-            width: size.width,
-            height: size.height,
-            present_mode: wgpu::PresentMode::Fifo,
-        };
-        let model = if let Some(filename) = filename {
-            let loader = Loader::new(filename);
-            let data = loader.parse_binary();
-            Some(Model::new(&device, &config, data.0.as_slice(), data.1.as_slice()))
-        } else {
-            None
-        };
+        
             
         surface.configure(&device, &config);
         let background = Background::new(&device, &config);

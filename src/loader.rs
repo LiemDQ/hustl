@@ -2,6 +2,7 @@ use std::{fs, hash::Hash};
 use byteorder::{LittleEndian, ReadBytesExt};
 use fxhash::FxHashMap;
 
+
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Vertex {
@@ -44,7 +45,7 @@ impl Loader {
         
     }
 
-    pub fn parse_binary(&self) -> (Vec<Vertex>, Vec<u32>) {
+    pub fn parse_binary(&mut self) -> (Vec<Vertex>, Vec<u32>) {
         // let file = std::fs::File::create(&self.filename).unwrap();
         let bytestream = fs::read(&self.filename).unwrap();
         if bytestream.len() < 84 {
@@ -60,23 +61,19 @@ impl Loader {
         // let mut triangle_data = Vec::new();
         let mut vertex_data = Vec::with_capacity(num_triangles as usize*3);
         let mut indices = Vec::with_capacity(num_triangles as usize *3);
-        let mut i = 0;
         //loop over every 50 chunks. The first 36 bytes are vertex data. 
-        body.chunks(50).map(|chunk| {
+        for chunk in body.chunks(50) {
             
             for n in 1..4 {
                 let mut vertex = Vertex {pos: [0.0;3]};
-                for (mut data, val) in chunk.chunks(4).skip(n*3).zip(vertex.pos.iter_mut()) {
-                    *val = data.read_f32::<LittleEndian>().unwrap();
+                for (data, val) in chunk.chunks(4).skip(n*3).zip(vertex.pos.iter_mut()) {
+                    *val = f32::from_le_bytes(data.try_into().expect("Slice with incorrect length"));
                 }
-                
-                vertex_data.push(vertex);
-                indices.push(i as u32);
-                i += 1;
+                let idx = self.insert_into_map(vertex, &mut vertex_data);
+                indices.push(idx);
             }
-           //last 2 bytes are the "attribute byte count" and are ignored.
-            
-        }).collect();
+           //last 2 bytes are the "attribute byte count" and are ignored.   
+        }
 
         // println!("{:?}", vertex_data);
         // println!("{}", indices.last().unwrap());
@@ -84,14 +81,14 @@ impl Loader {
         (vertex_data, indices)
     }
 
-    fn insert_into_map(&mut self, vertex: Vertex, vector: &mut Vec<Vertex>) -> usize {
-        if self.vertex_map.contains_key(&vertex) {
-            *self.vertex_map.get(&vertex).unwrap()
+    fn insert_into_map(&mut self, vertex: Vertex, vector: &mut Vec<Vertex>) -> u32 {
+        if let Some(idx) = self.vertex_map.get(&vertex) {
+            *idx as u32
         } else {
             vector.push(vertex);
             let idx = vector.len() -1;
             self.vertex_map.insert(vertex, idx);
-            idx
+            idx as u32
         }
     }
 

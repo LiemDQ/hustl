@@ -1,6 +1,7 @@
 // Taken from Foxtrot GUI crate.
 // https://github.com/Formlabs/foxtrot/blob/master/gui/src/backdrop.wgsl
-//this shader allows us to achieve a nice color gradient in the background.
+// This shader allows us to achieve a nice color gradient in the background.
+// Siple, but effective.
 
 struct VertexOutput {
     [[location(0)]] color: vec4<f32>;
@@ -10,8 +11,10 @@ struct VertexOutput {
 [[stage(vertex)]]
 fn vs_main([[builtin(vertex_index)]] in_vertex_index: u32) -> VertexOutput {
     var out: VertexOutput;
-    var c1: vec4<f32> = vec4<f32>(0.05, 0.06, 0.10, 1.0);
-    var c2: vec4<f32> = vec4<f32>(0.17, 0.22, 0.29, 1.0);
+    let c1 = vec4<f32>(0.05, 0.06, 0.10, 1.0);
+    let c2 = vec4<f32>(0.17, 0.22, 0.29, 1.0);
+    
+    //draw two triangles to cover the entirety of the screen
     if (in_vertex_index == 0u || in_vertex_index == 5u) {
         out.color = c1;
         out.position = vec4<f32>(-1.0, -1.0, 0.0, 1.0);
