@@ -22,7 +22,7 @@ pub struct State {
 }
 
 impl State {
-    pub fn new(start_time: std::time::SystemTime, filename: Option<String>, size: PhysicalSize<u32>, 
+    pub async fn new(start_time: std::time::SystemTime, filename: Option<String>, size: PhysicalSize<u32>, 
             adapter: wgpu::Adapter, surface: wgpu::Surface, device: wgpu::Device) -> Self {
         
         let config = wgpu::SurfaceConfiguration {
@@ -34,7 +34,7 @@ impl State {
         };
         let model = if let Some(filename) = filename {
             let loader = Loader{filename: filename};
-            let data = loader.parse_binary();
+            let data = loader.run().await;
             Some(Model::new(&device, &config, data.0.as_slice(), data.1.as_slice()))
         } else {
             None

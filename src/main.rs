@@ -49,7 +49,7 @@ async fn run(start_time: SystemTime, filename: Option<String>, event_loop: Event
     println!("GPU startup in {:?}", dt);
         
 
-    let mut state = State::new(start_time, filename, size, adapter, surface, device);
+    let mut state = State::new(start_time, filename, size, adapter, surface, device).await;
 
     event_loop.run(move |event, _, control_flow|  {
         *control_flow = ControlFlow::Wait;
