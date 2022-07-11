@@ -1,5 +1,5 @@
 [package]
-name = "vuestl"
+name = "hustl"
 version = "0.1.0"
 edition = "2021"
 authors = ["Liem Dam-Quang <liem.daq@gmail.com"]

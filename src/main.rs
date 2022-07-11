@@ -44,6 +44,10 @@ async fn run(start_time: SystemTime, filename: Option<String>, event_loop: Event
             }, 
             None
         ).await.unwrap();
+    let device_start_time = SystemTime::now();
+    let dt = device_start_time.duration_since(start_time).expect("Negative start time calculated?");
+    println!("GPU startup in {:?}", dt);
+        
 
     let mut state = State::new(start_time, filename, size, adapter, surface, device);
 
@@ -105,6 +109,6 @@ fn main() {
 
     let event_loop = EventLoop::new();
     let window = Window::new(&event_loop).unwrap();
-    window.set_title("Vuestl");
+    window.set_title("hustl");
     pollster::block_on(run(start, args.filename, event_loop, window));
 }
