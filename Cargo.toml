@@ -1,5 +1,5 @@
 [package]
-name = "vuestl"
+name = "hustl"
 version = "0.1.0"
 edition = "2021"
 authors = ["Liem Dam-Quang <liem.daq@gmail.com"]
@@ -20,6 +20,7 @@ cfg-if = "1"
 bytemuck = {version = "1.5", features = ["derive"]}
 anyhow = "1.0"
 itertools = "0.10"
+fxhash = "0.2.1"
 
 [target.'cfg(target_arch="wasm32")'.dependencies]
 console_error_panic_hook = "0.1.7"
