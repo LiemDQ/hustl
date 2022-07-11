@@ -183,9 +183,8 @@ impl Camera {
     }
 
     ///Holroyd's mapping blends a sphere and a hyperbola to eliminate discontinuities near the boundaries.
-    /// 
     fn project(pos: Vec2) -> Vec3 {
-        const RADIUS: f32 = 1.0;
+        const RADIUS: f32 = 0.60;
         if pos.magnitude() <= RADIUS/f32::sqrt(2.0) {
             Vec3::new(
                 pos.x,

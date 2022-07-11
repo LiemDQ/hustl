@@ -44,6 +44,10 @@ async fn run(start_time: SystemTime, filename: Option<String>, event_loop: Event
             }, 
             None
         ).await.unwrap();
+    let device_start_time = SystemTime::now();
+    let dt = device_start_time.duration_since(start_time).expect("Negative start time calculated?");
+    println!("GPU startup in {:?}", dt);
+        
 
     let mut state = State::new(start_time, filename, size, adapter, surface, device);
 
