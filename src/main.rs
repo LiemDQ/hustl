@@ -105,6 +105,6 @@ fn main() {
 
     let event_loop = EventLoop::new();
     let window = Window::new(&event_loop).unwrap();
-    window.set_title("Vuestl");
+    window.set_title("hustl");
     pollster::block_on(run(start, args.filename, event_loop, window));
 }
