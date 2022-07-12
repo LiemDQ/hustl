@@ -1,6 +1,7 @@
 use std::{fs, hash::Hash};
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::collections::HashMap;
+use std::time::SystemTime;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -17,6 +18,7 @@ impl PartialEq for Vertex {
 pub struct Loader {
     pub filename: String,
     // pub vertex_set: HashMap<Vertex, usize>
+    pub start_time: SystemTime,
 }
 
 impl Loader {
@@ -42,22 +44,28 @@ impl Loader {
     }
 
 
-    pub async fn run(&self, ) -> (Vec<Vertex>, Vec<u32>){
+    pub fn run(&self) -> (Vec<Vertex>, Vec<u32>){
+        
         let bytestream = fs::read(&self.filename).unwrap();
         if bytestream.len() < 84 {
             panic!("File is too small to be an STL file: ({} < 84 bytes)", bytestream.len());
         }
-        match std::str::from_utf8(&bytestream[0..5]) {
+        let result = match std::str::from_utf8(&bytestream[0..5]) {
             Ok(header) if header == "solid" => {
                 self.parse_ascii(String::from_utf8_lossy(bytestream.as_slice()).to_string())
             }
             _ => {
                 self.parse_binary(bytestream)
             }
-        } 
+        };
+        let parse_time = SystemTime::now();
+        let dt = parse_time.duration_since(self.start_time).expect("Negative parse time calculated?");
+        println!("Time to parse files {:?}", dt);
+        result
     }
 
     pub fn parse_binary(&self, bytestream: Vec<u8>) -> (Vec<Vertex>, Vec<u32>) {
+        
         //not sure if this approach is better than the byteorder approach, which requires a mutable borrow 
         //(and will be difficult to use in a multithreaded context.)
         let num_triangles = u32::from_le_bytes(bytestream[80..84].try_into().expect("Slice with incorrect length")); 
@@ -90,4 +98,9 @@ impl Loader {
     }
 
     
+}
+
+#[cfg(test)]
+mod test {
+
 }
