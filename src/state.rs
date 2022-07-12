@@ -1,11 +1,9 @@
 
 use nalgebra_glm::Vec2;
-use wgpu::Queue;
 use winit::dpi::PhysicalSize;
 use winit::event::{DeviceEvent, MouseScrollDelta, WindowEvent, ElementState};
 
 use crate::camera::Camera;
-use crate::loader::Loader;
 use crate::model::Model;
 use crate::bg::Background;
 pub struct State {
@@ -23,7 +21,7 @@ pub struct State {
 
 impl State {
     pub fn new(start_time: std::time::SystemTime, model: Option<Model>, size: PhysicalSize<u32>, 
-            adapter: wgpu::Adapter, surface: wgpu::Surface, device: wgpu::Device, config: wgpu::SurfaceConfiguration) -> Self {
+             surface: wgpu::Surface, device: wgpu::Device, config: wgpu::SurfaceConfiguration) -> Self {
       
             
         surface.configure(&device, &config);

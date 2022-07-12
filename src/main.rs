@@ -73,7 +73,7 @@ async fn run(start_time: SystemTime, filename: Option<String>, event_loop: Event
         Some(Model::new(&device, &config, data.0.as_slice(), data.1.as_slice()))
     };
         
-    let mut state = State::new(start_time, model, size, adapter, surface, device, config);
+    let mut state = State::new(start_time, model, size, surface, device, config);
 
     event_loop.run(move |event, _, control_flow|  {
         *control_flow = ControlFlow::Wait;
