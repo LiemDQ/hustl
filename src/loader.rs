@@ -106,10 +106,11 @@ mod test {
     use std::time::SystemTime;
 
     use super::{Loader, Vertex};
+    
 
     #[test]
     fn test_binary_load() {
-        let filename = "models/cube.stl".to_string();
+        let filename = "assets/cube.stl".to_string();
 
         let bytestream = fs::read(&filename).unwrap();
         let loader = Loader {filename, start_time: SystemTime::now()};
@@ -154,5 +155,64 @@ mod test {
         ];
         assert_eq!(ans.len(), vertices.len());
         assert_eq!(vertices, ans);
+    }
+
+    #[test]
+    fn test_ascii_load() {
+        let filename = "assets/cube-ascii.stl".to_string();
+        let stream = fs::read_to_string(&filename).unwrap();
+        let loader = Loader {filename, start_time: SystemTime::now()};
+        let (vertices, _) = loader.parse_ascii(stream);
+        let ans = vec![
+            Vertex { pos: [0.0, 0.0, 10.0] },
+            Vertex { pos: [10.0, 0.0, 10.0] },
+            Vertex { pos: [0.0, 10.0, 10.0] },
+
+            Vertex { pos: [10.0, 10.0, 10.0] },
+            Vertex { pos: [0.0, 10.0, 10.0] },
+            Vertex { pos: [10.0, 0.0, 10.0] },
+
+            Vertex { pos: [10.0, 0.0, 10.0] },
+            Vertex { pos: [10.0, 0.0, 0.0] },
+            Vertex { pos: [10.0, 10.0, 10.0] },
+
+            Vertex { pos: [10.0, 10.0, 0.0] },
+            Vertex { pos: [10.0, 10.0, 10.0] },
+            Vertex { pos: [10.0, 0.0, 0.0] },
+
+            Vertex { pos: [10.0, 0.0, 0.0] },
+            Vertex { pos: [0.0, 0.0, 0.0] },
+            Vertex { pos: [10.0, 10.0, 0.0] },
+
+            Vertex { pos: [0.0, 10.0, 0.0] },
+            Vertex { pos: [10.0, 10.0, 0.0] },
+            Vertex { pos: [0.0, 0.0, 0.0] },
+
+            Vertex { pos: [0.0, 0.0, 0.0] },
+            Vertex { pos: [0.0, 0.0, 10.0] },
+            Vertex { pos: [0.0, 10.0, 0.0] },
+
+            Vertex { pos: [0.0, 10.0, 10.0] },
+            Vertex { pos: [0.0, 10.0, 0.0] },
+            Vertex { pos: [0.0, 0.0, 10.0] },
+
+            Vertex { pos: [0.0, 10.0, 10.0] },
+            Vertex { pos: [10.0, 10.0, 10.0] },
+            Vertex { pos: [0.0, 10.0, 0.0] },
+
+            Vertex { pos: [10.0, 10.0, 0.0] },
+            Vertex { pos: [0.0, 10.0, 0.0] },
+            Vertex { pos: [10.0, 10.0, 10.0] },
+
+            Vertex { pos: [10.0, 0.0, 10.0] },
+            Vertex { pos: [0.0, 0.0, 10.0] },
+            Vertex { pos: [10.0, 0.0, 0.0] },
+
+            Vertex { pos: [0.0, 0.0, 0.0] },
+            Vertex { pos: [10.0, 0.0, 0.0] },
+            Vertex { pos: [0.0, 0.0, 10.0] }
+        ];
+        assert_eq!(ans.len(), vertices.len());
+        assert_eq!(ans, vertices);
     }
 }
