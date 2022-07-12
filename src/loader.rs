@@ -11,7 +11,7 @@ pub struct Vertex {
 
 impl PartialEq for Vertex {
     fn eq(&self, other: &Self) -> bool {
-        false
+        self.pos[0] == other.pos[0] && self.pos[1] == other.pos[1] && self.pos[2] == other.pos[2]
     }
 }
 
@@ -102,5 +102,57 @@ impl Loader {
 
 #[cfg(test)]
 mod test {
+    use std::fs;
+    use std::time::SystemTime;
 
+    use super::{Loader, Vertex};
+
+    #[test]
+    fn test_binary_load() {
+        let filename = "models/cube.stl".to_string();
+
+        let bytestream = fs::read(&filename).unwrap();
+        let loader = Loader {filename, start_time: SystemTime::now()};
+        let (vertices, _) = loader.parse_binary(bytestream);
+        let ans = vec![
+            Vertex { pos: [-35.0, 60.0, 20.0] },
+            Vertex { pos: [-55.0, 60.0, 20.0] },
+            Vertex { pos: [-35.0, 40.0, 20.0] },
+            Vertex { pos: [-35.0, 40.0, 20.0] },
+            Vertex { pos: [-55.0, 60.0, 20.0] },
+            Vertex { pos: [-55.0, 40.0, 20.0] },
+            Vertex { pos: [-35.0, 40.0, 0.0] },
+            Vertex { pos: [-55.0, 40.0, 0.0] },
+            Vertex { pos: [-35.0, 60.0, 0.0] },
+            Vertex { pos: [-35.0, 60.0, 0.0] },
+            Vertex { pos: [-55.0, 40.0, 0.0] },
+            Vertex { pos: [-55.0, 60.0, 0.0] },
+            Vertex { pos: [-55.0, 40.0, 20.0] },
+            Vertex { pos: [-55.0, 40.0, 0.0] },
+            Vertex { pos: [-35.0, 40.0, 20.0] },
+            Vertex { pos: [-35.0, 40.0, 20.0] },
+            Vertex { pos: [-55.0, 40.0, 0.0] },
+            Vertex { pos: [-35.0, 40.0, 0.0] },
+            Vertex { pos: [-55.0, 60.0, 20.0] },
+            Vertex { pos: [-55.0, 60.0, 0.0] },
+            Vertex { pos: [-55.0, 40.0, 20.0] },
+            Vertex { pos: [-55.0, 40.0, 20.0] },
+            Vertex { pos: [-55.0, 60.0, 0.0] },
+            Vertex { pos: [-55.0, 40.0, 0.0] },
+            Vertex { pos: [-35.0, 60.0, 20.0] },
+            Vertex { pos: [-35.0, 60.0, 0.0] },
+            Vertex { pos: [-55.0, 60.0, 20.0] },
+            Vertex { pos: [-55.0, 60.0, 20.0] },
+            Vertex { pos: [-35.0, 60.0, 0.0] },
+            Vertex { pos: [-55.0, 60.0, 0.0] },
+            Vertex { pos: [-35.0, 40.0, 20.0] },
+            Vertex { pos: [-35.0, 40.0, 0.0] },
+            Vertex { pos: [-35.0, 60.0, 20.0] },
+            Vertex { pos: [-35.0, 60.0, 20.0] },
+            Vertex { pos: [-35.0, 40.0, 0.0] },
+            Vertex { pos: [-35.0, 60.0, 0.0] }
+        ];
+        assert_eq!(ans.len(), vertices.len());
+        assert_eq!(vertices, ans);
+    }
 }
