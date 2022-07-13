@@ -1,9 +1,7 @@
 use std::{fs, hash::Hash};
-use fxhash::FxHashMap;
 use ahash::AHashMap;
 use std::time::SystemTime;
 use std::thread;
-
 
 const BYTES_PER_TRIANGLE: u32 = 50;
 
