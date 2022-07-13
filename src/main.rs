@@ -26,7 +26,7 @@ async fn run(start_time: SystemTime, filename: Option<String>, event_loop: Event
     let instance = wgpu::Instance::new(wgpu::Backends::all());
     let surface = unsafe { instance.create_surface(&window)};
     
-    let loader = Loader::new(filename.unwrap(), start_time);
+    let loader = Loader::new(filename.unwrap(), start_time, None);
     let data_future = tokio::spawn(
         async move {
             loader.run()            
