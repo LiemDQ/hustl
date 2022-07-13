@@ -289,64 +289,47 @@ mod test {
     use std::time::SystemTime;
 
     use super::{Loader, Vertex};
-    
 
-    #[test]
-    fn test_binary_load() {
-        let filename = "assets/cube.stl".to_string();
+    const CUBE_VERTICES: [Vertex; 36] = [
+        Vertex { pos: [-35.0, 60.0, 20.0] },
+        Vertex { pos: [-55.0, 60.0, 20.0] },
+        Vertex { pos: [-35.0, 40.0, 20.0] },
+        Vertex { pos: [-35.0, 40.0, 20.0] },
+        Vertex { pos: [-55.0, 60.0, 20.0] },
+        Vertex { pos: [-55.0, 40.0, 20.0] },
+        Vertex { pos: [-35.0, 40.0, 0.0] },
+        Vertex { pos: [-55.0, 40.0, 0.0] },
+        Vertex { pos: [-35.0, 60.0, 0.0] },
+        Vertex { pos: [-35.0, 60.0, 0.0] },
+        Vertex { pos: [-55.0, 40.0, 0.0] },
+        Vertex { pos: [-55.0, 60.0, 0.0] },
+        Vertex { pos: [-55.0, 40.0, 20.0] },
+        Vertex { pos: [-55.0, 40.0, 0.0] },
+        Vertex { pos: [-35.0, 40.0, 20.0] },
+        Vertex { pos: [-35.0, 40.0, 20.0] },
+        Vertex { pos: [-55.0, 40.0, 0.0] },
+        Vertex { pos: [-35.0, 40.0, 0.0] },
+        Vertex { pos: [-55.0, 60.0, 20.0] },
+        Vertex { pos: [-55.0, 60.0, 0.0] },
+        Vertex { pos: [-55.0, 40.0, 20.0] },
+        Vertex { pos: [-55.0, 40.0, 20.0] },
+        Vertex { pos: [-55.0, 60.0, 0.0] },
+        Vertex { pos: [-55.0, 40.0, 0.0] },
+        Vertex { pos: [-35.0, 60.0, 20.0] },
+        Vertex { pos: [-35.0, 60.0, 0.0] },
+        Vertex { pos: [-55.0, 60.0, 20.0] },
+        Vertex { pos: [-55.0, 60.0, 20.0] },
+        Vertex { pos: [-35.0, 60.0, 0.0] },
+        Vertex { pos: [-55.0, 60.0, 0.0] },
+        Vertex { pos: [-35.0, 40.0, 20.0] },
+        Vertex { pos: [-35.0, 40.0, 0.0] },
+        Vertex { pos: [-35.0, 60.0, 20.0] },
+        Vertex { pos: [-35.0, 60.0, 20.0] },
+        Vertex { pos: [-35.0, 40.0, 0.0] },
+        Vertex { pos: [-35.0, 60.0, 0.0] }
+    ];
 
-        let bytestream = fs::read(&filename).unwrap();
-        let loader = Loader::new(filename,SystemTime::now());
-        let (vertices, _) = loader.parse_binary(bytestream);
-        let ans = vec![
-            Vertex { pos: [-35.0, 60.0, 20.0] },
-            Vertex { pos: [-55.0, 60.0, 20.0] },
-            Vertex { pos: [-35.0, 40.0, 20.0] },
-            Vertex { pos: [-35.0, 40.0, 20.0] },
-            Vertex { pos: [-55.0, 60.0, 20.0] },
-            Vertex { pos: [-55.0, 40.0, 20.0] },
-            Vertex { pos: [-35.0, 40.0, 0.0] },
-            Vertex { pos: [-55.0, 40.0, 0.0] },
-            Vertex { pos: [-35.0, 60.0, 0.0] },
-            Vertex { pos: [-35.0, 60.0, 0.0] },
-            Vertex { pos: [-55.0, 40.0, 0.0] },
-            Vertex { pos: [-55.0, 60.0, 0.0] },
-            Vertex { pos: [-55.0, 40.0, 20.0] },
-            Vertex { pos: [-55.0, 40.0, 0.0] },
-            Vertex { pos: [-35.0, 40.0, 20.0] },
-            Vertex { pos: [-35.0, 40.0, 20.0] },
-            Vertex { pos: [-55.0, 40.0, 0.0] },
-            Vertex { pos: [-35.0, 40.0, 0.0] },
-            Vertex { pos: [-55.0, 60.0, 20.0] },
-            Vertex { pos: [-55.0, 60.0, 0.0] },
-            Vertex { pos: [-55.0, 40.0, 20.0] },
-            Vertex { pos: [-55.0, 40.0, 20.0] },
-            Vertex { pos: [-55.0, 60.0, 0.0] },
-            Vertex { pos: [-55.0, 40.0, 0.0] },
-            Vertex { pos: [-35.0, 60.0, 20.0] },
-            Vertex { pos: [-35.0, 60.0, 0.0] },
-            Vertex { pos: [-55.0, 60.0, 20.0] },
-            Vertex { pos: [-55.0, 60.0, 20.0] },
-            Vertex { pos: [-35.0, 60.0, 0.0] },
-            Vertex { pos: [-55.0, 60.0, 0.0] },
-            Vertex { pos: [-35.0, 40.0, 20.0] },
-            Vertex { pos: [-35.0, 40.0, 0.0] },
-            Vertex { pos: [-35.0, 60.0, 20.0] },
-            Vertex { pos: [-35.0, 60.0, 20.0] },
-            Vertex { pos: [-35.0, 40.0, 0.0] },
-            Vertex { pos: [-35.0, 60.0, 0.0] }
-        ];
-        assert_eq!(ans.len(), vertices.len());
-        assert_eq!(vertices, ans);
-    }
-
-    #[test]
-    fn test_ascii_load() {
-        let filename = "assets/cube-ascii.stl".to_string();
-        let stream = fs::read_to_string(&filename).unwrap();
-        let loader = Loader::new(filename, SystemTime::now());
-        let (vertices, _) = loader.parse_ascii(stream);
-        let ans = vec![
+    const ASCII_CUBE_VERTICES: [Vertex;36] = [
             Vertex { pos: [0.0, 0.0, 10.0] },
             Vertex { pos: [10.0, 0.0, 10.0] },
             Vertex { pos: [0.0, 10.0, 10.0] },
@@ -395,7 +378,28 @@ mod test {
             Vertex { pos: [10.0, 0.0, 0.0] },
             Vertex { pos: [0.0, 0.0, 10.0] }
         ];
+    
+
+    #[test]
+    fn test_binary_load() {
+        let filename = "assets/cube.stl".to_string();
+
+        let bytestream = fs::read(&filename).unwrap();
+        let loader = Loader::new(filename,SystemTime::now());
+        let (vertices, _) = loader.parse_binary(bytestream);
+        let ans = &CUBE_VERTICES[..];
         assert_eq!(ans.len(), vertices.len());
-        assert_eq!(ans, vertices);
+        assert_eq!(vertices, ans);
+    }
+
+    #[test]
+    fn test_ascii_load() {
+        let filename = "assets/cube-ascii.stl".to_string();
+        let stream = fs::read_to_string(&filename).unwrap();
+        let loader = Loader::new(filename, SystemTime::now());
+        let (vertices, _) = loader.parse_ascii(stream);
+        let ans = &ASCII_CUBE_VERTICES[..];
+        assert_eq!(ans.len(), vertices.len());
+        assert_eq!(vertices, ans);
     }
 }
