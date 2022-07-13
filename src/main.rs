@@ -12,9 +12,9 @@ use winit::{
 };
 use clap::Parser;
 
-use crate::state::State;
 use crate::loader::Loader;
 use crate::model::Model;
+use crate::state::State;
 
 #[derive(clap::Parser)]
 struct Args {
@@ -25,6 +25,14 @@ async fn run(start_time: SystemTime, filename: Option<String>, event_loop: Event
     let size = window.inner_size();
     let instance = wgpu::Instance::new(wgpu::Backends::all());
     let surface = unsafe { instance.create_surface(&window)};
+    
+    let loader = Loader::new(filename.unwrap(), start_time);
+    let data_future = tokio::spawn(
+        async move {
+            loader.run()            
+        }
+    );
+
     let adapter = instance.request_adapter(
         &wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::default(),
@@ -33,16 +41,7 @@ async fn run(start_time: SystemTime, filename: Option<String>, event_loop: Event
         }
     ).await.unwrap();
 
-    let config = wgpu::SurfaceConfiguration {
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-        format: surface.get_preferred_format(&adapter).unwrap(),
-        width: size.width,
-        height: size.height,
-        present_mode: wgpu::PresentMode::Fifo,
-    };
-    
-
-    let adapter_request = adapter
+    let adapter_future = adapter
         .request_device(
             &wgpu::DeviceDescriptor {
                 label: None,
@@ -55,18 +54,26 @@ async fn run(start_time: SystemTime, filename: Option<String>, event_loop: Event
             }, 
             None
         );
-
-    let (model, device, queue) = if let Some(filename) = filename {
-        let mut loader = Loader::new(filename);
-        let data = loader.parse_binary();
-        let (device, queue) = adapter_request.await.unwrap();
-        (Some(Model::new(&device, &config, data.0.as_slice(), data.1.as_slice())), device, queue)
-    } else {
-        let (device, queue) = adapter_request.await.unwrap();
-        (None, device, queue)
+    let config = wgpu::SurfaceConfiguration {
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+        format: surface.get_preferred_format(&adapter).unwrap(),
+        width: size.width,
+        height: size.height,
+        present_mode: wgpu::PresentMode::Fifo,
     };
 
-    let mut state = State::new(start_time, model, size, adapter, surface, device, config);
+    let (device, queue) = adapter_future.await.unwrap();
+
+    let device_start_time = SystemTime::now();
+    let dt = device_start_time.duration_since(start_time).expect("Negative start time calculated?");
+    println!("GPU startup in {:?}", dt);
+
+    let model = {
+        let data = data_future.await.unwrap();
+        Some(Model::new(&device, &config, data.0.as_slice(), data.1.as_slice()))
+    };
+        
+    let mut state = State::new(start_time, model, size, surface, device, config);
 
     event_loop.run(move |event, _, control_flow|  {
         *control_flow = ControlFlow::Wait;
@@ -112,7 +119,8 @@ async fn run(start_time: SystemTime, filename: Option<String>, event_loop: Event
     });
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let start = SystemTime::now();
     cfg_if::cfg_if!{
         if #[cfg(target_arch = "wasm32")] {
@@ -127,5 +135,5 @@ fn main() {
     let event_loop = EventLoop::new();
     let window = Window::new(&event_loop).unwrap();
     window.set_title("hustl");
-    pollster::block_on(run(start, args.filename, event_loop, window));
+    run(start, args.filename, event_loop, window).await;
 }
