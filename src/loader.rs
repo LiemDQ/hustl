@@ -49,7 +49,7 @@ impl Loader {
 
         let num_triangles = (floats.len()/12) as u32;
         let num_threads = if let Some(max_workers) = self.max_workers {
-            max_workers.max(thread::available_parallelism().expect("Could not query number of cores").get()) as u32
+            max_workers.min(thread::available_parallelism().expect("Could not query number of cores").get()) as u32
         } else {
             thread::available_parallelism().expect("Could not query number of cores").get() as u32
         };
@@ -124,7 +124,7 @@ impl Loader {
 
         //TODO: enable multithreading
         let num_threads = if let Some(max_workers) = self.max_workers {
-            max_workers.max(thread::available_parallelism().expect("Could not query number of cores").get()) as u32
+            max_workers.min(thread::available_parallelism().expect("Could not query number of cores").get()) as u32
         } else {
             thread::available_parallelism().expect("Could not query number of cores").get() as u32
         };
