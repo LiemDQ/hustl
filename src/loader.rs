@@ -170,13 +170,13 @@ impl Loader {
 struct Worker {
     vertex_map: AHashMap<Vertex, u32>,
     id: u32, 
-    triangles_per_thread: u32
+    triangles_per_worker: u32
 }
 
 impl Worker {
 
-    pub fn new(id: u32, triangles_per_thread: u32) -> Self {
-        Self {vertex_map: AHashMap::default(), id, triangles_per_thread}
+    pub fn new(id: u32, triangles_per_worker: u32) -> Self {
+        Self {vertex_map: AHashMap::default(), id, triangles_per_worker}
     }
 
     pub fn run_binary(&mut self, bytes: &[u8], n: u32) -> (Vec<Vertex>, Vec<u32>) {
@@ -272,7 +272,7 @@ impl Worker {
     }
 
     fn calculate_index(&self, idx: u32) -> u32 {
-        idx + self.id*self.triangles_per_thread*3
+        idx + self.id*self.triangles_per_worker*3
     }
     
     #[allow(dead_code)]
@@ -288,7 +288,7 @@ mod test {
     use std::fs;
     use std::time::SystemTime;
 
-    use super::{Loader, Vertex};
+    use super::{Loader, Vertex, BYTES_PER_TRIANGLE, Worker};
 
     const CUBE_VERTICES: [Vertex; 36] = [
         Vertex { pos: [-35.0, 60.0, 20.0] },
@@ -378,7 +378,58 @@ mod test {
             Vertex { pos: [10.0, 0.0, 0.0] },
             Vertex { pos: [0.0, 0.0, 10.0] }
         ];
-    
+
+    const CUBE_VERTICES_DEDUPLICATED: [Vertex; 8] = [
+        Vertex { pos: [-35.0, 60.0, 20.0] }, 
+        Vertex { pos: [-55.0, 60.0, 20.0] }, 
+        Vertex { pos: [-35.0, 40.0, 20.0] }, 
+        Vertex { pos: [-55.0, 40.0, 20.0] }, 
+        Vertex { pos: [-35.0, 40.0, 0.0] }, 
+        Vertex { pos: [-55.0, 40.0, 0.0] }, 
+        Vertex { pos: [-35.0, 60.0, 0.0] }, 
+        Vertex { pos: [-55.0, 60.0, 0.0] }
+    ];
+
+    const CUBE_INDICES: [u32; 36] = [
+        0, 1, 2, 
+        2, 1, 3, 
+        4, 5, 6, 
+        6, 5, 7, 
+        3, 5, 2,
+        2, 5, 4, 
+        1, 7, 3, 
+        3, 7, 5, 
+        0, 6, 1, 
+        1, 6, 7, 
+        2, 4, 0, 
+        0, 4, 6
+    ];
+
+    const ASCII_CUBE_VERTICES_DEDUPLICATED: [Vertex; 8] = [
+        Vertex { pos: [0.0, 0.0, 10.0] },   //0
+        Vertex { pos: [10.0, 0.0, 10.0] },  //1
+        Vertex { pos: [0.0, 10.0, 10.0] },  //2
+        Vertex { pos: [10.0, 10.0, 10.0] }, //3
+        Vertex { pos: [10.0, 0.0, 0.0] },   //4
+        Vertex { pos: [10.0, 10.0, 0.0] },  //5
+        Vertex { pos: [0.0, 0.0, 0.0] },    //6
+        Vertex { pos: [0.0, 10.0, 0.0] }    //7
+    ];
+
+    const ASCII_CUBE_INDICES: [u32; 36] = [
+        0, 1, 2, 
+        3, 2, 1,
+        1, 4, 3,
+        5, 3, 4,
+        4, 6, 5,
+        7, 5, 6,
+        6, 0, 7,
+        2, 7, 0,
+        2, 3, 7,
+        5, 7, 3,
+        1, 0, 4, 
+        6, 4, 0,
+    ];
 
     #[test]
     fn test_binary_load() {
@@ -401,5 +452,67 @@ mod test {
         let ans = &ASCII_CUBE_VERTICES[..];
         assert_eq!(ans.len(), vertices.len());
         assert_eq!(vertices, ans);
+    }
+
+    #[test]
+    fn test_binary_unindexed_worker(){
+        let filename = "assets/cube.stl".to_string();
+        let bytestream = fs::read(&filename).unwrap();
+        let bytes = &bytestream[84..];
+        let num_triangles = bytes.len() as u32/BYTES_PER_TRIANGLE ;
+        let worker = Worker::new(0, num_triangles);
+        let (vertices, _) = worker.get_binary_vertices_unindexed(bytes, num_triangles*3);
+
+        assert_eq!(vertices, &CUBE_VERTICES[..]);
+    }
+
+    #[test]
+    fn test_binary_indexed_worker(){
+        let filename = "assets/cube.stl".to_string();
+        let bytestream = fs::read(&filename).unwrap();
+        let bytes = &bytestream[84..];
+        let num_triangles = bytes.len() as u32/BYTES_PER_TRIANGLE ;
+        let mut worker = Worker::new(0, num_triangles);
+        let (vertices, indices) = worker.get_binary_vertices_indexed(bytes, num_triangles*3);
+
+        assert_eq!(vertices, &CUBE_VERTICES_DEDUPLICATED[..]);
+        assert_eq!(indices, &CUBE_INDICES[..]);
+    }
+
+    #[test]
+    fn test_ascii_unindexed_worker(){
+        let filename = "assets/cube-ascii.stl".to_string();
+        let stream = fs::read_to_string(&filename).unwrap();
+        let floats: Vec<f32> = stream
+        .split_ascii_whitespace()
+        .filter_map(|s| s.parse::<f32>().ok())
+        .collect();
+
+        let num_triangles = (floats.len()/12) as u32;
+
+        let worker = Worker::new(0, num_triangles);
+        let (vertices, _) = worker.get_ascii_vertices_unindexed(floats.as_slice());
+        let ans = &ASCII_CUBE_VERTICES[..];
+
+        assert_eq!(vertices, ans);
+    }
+
+    #[test]
+    fn test_ascii_indexed_worker(){
+        let filename = "assets/cube-ascii.stl".to_string();
+        let stream = fs::read_to_string(&filename).unwrap();
+        let floats: Vec<f32> = stream
+        .split_ascii_whitespace()
+        .filter_map(|s| s.parse::<f32>().ok())
+        .collect();
+
+        let num_triangles = (floats.len()/12) as u32;
+
+        let mut worker = Worker::new(0, num_triangles);
+        let (vertices, indices) = worker.get_ascii_vertices_indexed(floats.as_slice());
+        let ans = &ASCII_CUBE_VERTICES_DEDUPLICATED[..];
+
+        assert_eq!(vertices, ans);
+        assert_eq!(indices, &ASCII_CUBE_INDICES[..]);
     }
 }
