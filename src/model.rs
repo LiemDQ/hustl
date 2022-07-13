@@ -1,6 +1,6 @@
 use wgpu::util::DeviceExt;
 use nalgebra_glm as glm;
-use glm::{Vec3, Vec4, Mat4};
+use glm::{Mat4};
 use crate::loader::Vertex;
 use crate::camera::Camera;
 
@@ -11,14 +11,12 @@ pub struct Model {
     camera_bind_group: wgpu::BindGroup,
     render_pipeline: wgpu::RenderPipeline,
     num_indices: u32,
-    num_vertices: u32,
 }
 
 impl Model {
     pub fn new(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration, vertices: &[Vertex], indices: &[u32]) -> Self {
         
-        let num_vertices = vertices.len() as u32;
-        println!("Polygons: {}", num_vertices/3);
+        println!("Polygons: {}", indices.len()/3);
 
         // println!("{:?}", vertices);
 
@@ -156,7 +154,6 @@ impl Model {
             vertex_buffer,
             camera_buffer,
             camera_bind_group,
-            num_vertices,
             num_indices: indices.len() as u32
         }
 
@@ -171,9 +168,7 @@ impl Model {
         let view_matrix = camera.view_matrix();
         let model_matrix = camera.model_matrix();
         let proj_matrix = camera.proj_matrix();
-        // println!("View matrix: {}", view_matrix);
-        // println!("Model matrix: {}", model_matrix);
-        // println!("Proj matrix: {}", proj_matrix);
+
         queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(view_matrix.as_slice()));
         queue.write_buffer(&self.camera_buffer, 
             std::mem::size_of::<Mat4>() as wgpu::BufferAddress, 
@@ -215,7 +210,7 @@ impl Model {
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
         render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
         //TODO: replace with indexed draw call
-        render_pass.draw(0..self.num_vertices, 0..1);
+        render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
     }
 
     pub fn get_depth_texture(config: &wgpu::SurfaceConfiguration, device: &wgpu::Device) 
