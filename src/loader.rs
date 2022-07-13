@@ -1,5 +1,4 @@
 use std::{fs, hash::Hash};
-use byteorder::{LittleEndian, ReadBytesExt};
 use fxhash::FxHashMap;
 use ahash::AHashMap;
 use std::time::SystemTime;
@@ -7,6 +6,9 @@ use std::thread;
 
 
 const BYTES_PER_TRIANGLE: u32 = 50;
+
+///includes normal vector, which isn't used in our implementation
+const FLOATS_PER_TRIANGLE: u32 = 12; 
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -45,19 +47,50 @@ impl Loader {
         .split_ascii_whitespace()
         .filter_map(|s| s.parse::<f32>().ok())
         .collect();
-        
-        let mut vertices = Vec::with_capacity(floats.len()/12);
-        let mut indices = Vec::with_capacity(floats.len()/12);
-        let mut i = 0;
-        for triangle in floats.chunks(12) {
-            for vertex in triangle[3..].chunks(3) {
-                vertices.push(Vertex { pos: vertex.try_into().expect("Slice with incorrect length")});
-                indices.push(i);
-                i += 1;
-            }
-        }
 
-        (vertices, indices)
+        let num_triangles = (floats.len()/12) as u32;
+        let num_threads = thread::available_parallelism().expect("Could not query threads").get() as u32;
+        println!("Number of loaders: {}", num_threads);
+        let triangles_per_thread = num_triangles/num_threads;
+        let remaining_triangles = num_triangles % num_threads;
+
+        let float_slice = floats.as_slice();
+
+        crossbeam::scope(move |s| {
+            let handles: Vec<crossbeam::thread::ScopedJoinHandle<_>> = (0..num_threads).map(|n| {
+                let mut worker = Worker::new(n, triangles_per_thread);
+                if n == num_threads - 1 {
+                    let starting_float = (FLOATS_PER_TRIANGLE*triangles_per_thread*n) as usize;
+                    s.spawn( move |_| {
+                        worker.run_ascii(&float_slice[starting_float..])
+                    })
+                } else {
+                    let starting_float = (FLOATS_PER_TRIANGLE*triangles_per_thread*n) as usize;
+                    let ending_float = (FLOATS_PER_TRIANGLE*triangles_per_thread*(n+1)) as usize;
+                    s.spawn ( move |_| {
+                        worker.run_ascii(&float_slice[starting_float..ending_float])
+                    })
+                }
+            }).collect();
+
+            //with vector indexing we roughly estimate number of entries is divided by 6
+            let mut vertex_data = Vec::with_capacity(num_triangles as usize/2);
+            let mut indices = Vec::with_capacity(num_triangles as usize *3);
+            let mut current_index: u32 = 0;
+
+            for handle in handles {
+                let (data, idx) = handle.join().unwrap();
+
+                vertex_data.extend(&data);
+                
+                //the index numbers need to be offset based on how many entries are currently in the vertex_data vector, 
+                //since they start from 0.
+                indices.extend(idx.iter().map(|idx| *idx + current_index)); 
+                current_index = vertex_data.len() as u32;
+            }
+
+            (vertex_data, indices)
+        }).unwrap()        
     }
 
 
@@ -149,11 +182,15 @@ impl Worker {
     }
 
     pub fn run_binary(&mut self, bytes: &[u8], n: u32) -> (Vec<Vertex>, Vec<u32>) {
-        self.get_vertices_indexed(bytes, n)
+        self.get_binary_vertices_indexed(bytes, n)
+    }
+
+    pub fn run_ascii(&mut self, floats: &[f32]) -> (Vec<Vertex>, Vec<u32>){
+        self.get_ascii_vertices_indexed(floats)
     }
     
     #[allow(dead_code)]
-    fn get_vertices_unindexed(&self, bytes: &[u8], n: u32) -> (Vec<Vertex>, Vec<u32>) {
+    fn get_binary_vertices_unindexed(&self, bytes: &[u8], n: u32) -> (Vec<Vertex>, Vec<u32>) {
         let mut i = 0;
         let mut vertex_data = Vec::with_capacity(n as usize);
         let mut indices = Vec::with_capacity(n as usize);
@@ -173,7 +210,7 @@ impl Worker {
         (vertex_data, indices)
     }
 
-    fn get_vertices_indexed(&mut self, bytes: &[u8], n: u32) -> (Vec<Vertex>, Vec<u32>) {
+    fn get_binary_vertices_indexed(&mut self, bytes: &[u8], n: u32) -> (Vec<Vertex>, Vec<u32>) {
         let mut vertex_data = Vec::with_capacity(n as usize*3);
         let mut indices = Vec::with_capacity(n as usize *3);
         //loop over every 50 chunks. The first 36 bytes are vertex data. 
@@ -184,7 +221,7 @@ impl Worker {
                 for (data, val) in chunk.chunks(4).skip(n*3).zip(vertex.pos.iter_mut()) {
                     *val = f32::from_le_bytes(data.try_into().expect("Slice with incorrect length"));
                 }
-                let idx = self.insert_into_map(vertex, &mut vertex_data);
+                let idx = self.get_vertex_index(vertex, &mut vertex_data);
                 indices.push(idx);
             }
            //last 2 bytes are the "attribute byte count" and are ignored.   
@@ -193,7 +230,39 @@ impl Worker {
         (vertex_data, indices)
     }
 
-    fn insert_into_map(&mut self, vertex: Vertex, vector: &mut Vec<Vertex>) -> u32 {
+    #[allow(dead_code)]
+    fn get_ascii_vertices_unindexed(&self, floats: &[f32]) -> (Vec<Vertex>, Vec<u32>){
+        let mut vertices = Vec::with_capacity(floats.len()/12*3);
+        let mut indices = Vec::with_capacity(floats.len()/12*3);
+        let mut i = 0;
+        for triangle in floats.chunks(12) {
+            for vertex in triangle[3..].chunks(3) {
+                vertices.push(Vertex { pos: vertex.try_into().expect("Slice with incorrect length")});
+                indices.push(i);
+                i += 1;
+            }
+        }
+
+        (vertices, indices)
+    }
+
+    fn get_ascii_vertices_indexed(&mut self, floats: &[f32]) -> (Vec<Vertex>, Vec<u32>){
+        let mut vertices = Vec::with_capacity(floats.len()/12*3);
+        let mut indices = Vec::with_capacity(floats.len()/12*3);
+        for triangle in floats.chunks(12) {
+            for vertex in triangle[3..].chunks(3) {
+                let idx = self.get_vertex_index(
+                    Vertex { pos: vertex.try_into().expect("Slice with incorrect length")},
+                    &mut vertices
+                );
+                indices.push(idx)
+            }
+        }
+
+        (vertices, indices)
+    }
+
+    fn get_vertex_index(&mut self, vertex: Vertex, vector: &mut Vec<Vertex>) -> u32 {
         if let Some(idx) = self.vertex_map.get(&vertex) {
             *idx
         } else {
