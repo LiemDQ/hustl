@@ -1,9 +1,12 @@
 use std::{fs, hash::Hash};
 use byteorder::{LittleEndian, ReadBytesExt};
 use fxhash::FxHashMap;
-
+use ahash::AHashMap;
 use std::time::SystemTime;
 use std::thread;
+
+
+const BYTES_PER_TRIANGLE: u32 = 50;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
@@ -97,15 +100,15 @@ impl Loader {
         
         crossbeam::scope(move |s| {
             let handles: Vec<crossbeam::thread::ScopedJoinHandle<_>> = (0..num_threads).map(|n| {
-                let worker = Worker::new();
+                let worker = Worker::new(n, triangles_per_thread);
                 if n == num_threads - 1 {
-                    let starting_byte = (50*triangles_per_thread*n) as usize;
+                    let starting_byte = (BYTES_PER_TRIANGLE*triangles_per_thread*n) as usize;
                     s.spawn( move |_| {
                         worker.run_binary(&body[starting_byte..], (triangles_per_thread+ remaining_triangles)*3)
                     })
                 } else {
-                    let starting_byte = (50*triangles_per_thread*n) as usize;
-                    let ending_byte = (50*triangles_per_thread*(n+1)) as usize;
+                    let starting_byte = (BYTES_PER_TRIANGLE*triangles_per_thread*n) as usize;
+                    let ending_byte = (BYTES_PER_TRIANGLE*triangles_per_thread*(n+1)) as usize;
                     s.spawn ( move |_| {
                         worker.run_binary(&body[starting_byte..ending_byte], triangles_per_thread*3)
                     })
@@ -137,17 +140,37 @@ impl Loader {
     }    
 }
 
+/// Loader worker
+/// Worker id is a value between 0 and X, where X is the maximum number of threads. 
 struct Worker {
-
+    vertex_map: AHashMap<Vertex, u32>,
+    id: u32, 
+    triangles_per_thread: u32
 }
 
 impl Worker {
 
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(id: u32, triangles_per_thread: u32) -> Self {
+        Self {vertex_map: AHashMap::default(), id, triangles_per_thread}
     }
+
     pub fn run_binary(&self, bytes: &[u8], n: u32) -> (Vec<Vertex>, Vec<u32>) {
-        let mut i = 0;
+        self.get_vertices_unindexed(bytes, n)
+    }
+
+    fn insert_into_map(&mut self, vertex: Vertex, vector: &mut Vec<Vertex>) -> u32 {
+        if let Some(idx) = self.vertex_map.get(&vertex) {
+            *idx
+        } else {
+            vector.push(vertex);
+            let idx = self.calculate_index((vector.len() -1) as u32);
+            self.vertex_map.insert(vertex, idx);
+            idx
+        }
+    }
+
+    fn get_vertices_unindexed(&self, bytes: &[u8], n: u32) -> (Vec<Vertex>, Vec<u32>) {
+        let mut i = self.calculate_starting_index();
         let mut vertex_data = Vec::with_capacity(n as usize);
         let mut indices = Vec::with_capacity(n as usize);
 
@@ -164,6 +187,18 @@ impl Worker {
             //last 2 bytes are the "attribute byte count" and are ignored.
         }
         (vertex_data, indices)
+    }
+
+    fn get_vertices_indexed(&self, bytes: &[u8], n: u32) -> (Vec<Vertex>, Vec<u32>) {
+        todo!("vvertex indexing")
+    }
+
+    fn calculate_index(&self, idx: u32) -> u32 {
+        idx + self.id*self.triangles_per_thread*3
+    }
+
+    fn calculate_starting_index(&self) -> u32 {
+        self.calculate_index(0)
     }
 }
 
