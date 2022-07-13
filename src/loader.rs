@@ -439,7 +439,6 @@ mod test {
         let loader = Loader::new(filename,SystemTime::now());
         let (vertices, _) = loader.parse_binary(bytestream);
         let ans = &CUBE_VERTICES[..];
-        assert_eq!(ans.len(), vertices.len());
         assert_eq!(vertices, ans);
     }
 
@@ -450,7 +449,6 @@ mod test {
         let loader = Loader::new(filename, SystemTime::now());
         let (vertices, _) = loader.parse_ascii(stream);
         let ans = &ASCII_CUBE_VERTICES[..];
-        assert_eq!(ans.len(), vertices.len());
         assert_eq!(vertices, ans);
     }
 
