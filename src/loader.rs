@@ -33,11 +33,12 @@ impl Hash for Vertex {
 pub struct Loader {
     pub filename: String,
     pub start_time: SystemTime,
+    pub max_workers: Option<usize>, 
 }
 
 impl Loader {
-    pub fn new(filename: String, start_time: SystemTime) -> Self {
-        Self { filename, start_time}
+    pub fn new(filename: String, start_time: SystemTime, max_workers: Option<usize>) -> Self {
+        Self { filename, start_time, max_workers}
     }
 
     fn parse_ascii(&self, stream: String) -> (Vec<Vertex>, Vec<u32>) {
@@ -47,10 +48,13 @@ impl Loader {
         .collect();
 
         let num_triangles = (floats.len()/12) as u32;
-        let num_threads = thread::available_parallelism().expect("Could not query threads").get() as u32;
+        let num_threads = if let Some(max_workers) = self.max_workers {
+            max_workers.max(thread::available_parallelism().expect("Could not query number of cores").get()) as u32
+        } else {
+            thread::available_parallelism().expect("Could not query number of cores").get() as u32
+        };
         println!("Number of loaders: {}", num_threads);
         let triangles_per_thread = num_triangles/num_threads;
-        let remaining_triangles = num_triangles % num_threads;
 
         let float_slice = floats.as_slice();
 
@@ -119,7 +123,11 @@ impl Loader {
         let num_triangles = u32::from_le_bytes(bytestream[80..84].try_into().expect("Slice with incorrect length")); 
 
         //TODO: enable multithreading
-        let num_threads = thread::available_parallelism().expect("Could not query threads").get() as u32;
+        let num_threads = if let Some(max_workers) = self.max_workers {
+            max_workers.max(thread::available_parallelism().expect("Could not query number of cores").get()) as u32
+        } else {
+            thread::available_parallelism().expect("Could not query number of cores").get() as u32
+        };
         println!("Number of loaders: {}", num_threads);
         let triangles_per_thread = num_triangles/num_threads;
         let remaining_triangles = num_triangles % num_threads;
@@ -436,20 +444,33 @@ mod test {
         let filename = "assets/cube.stl".to_string();
 
         let bytestream = fs::read(&filename).unwrap();
-        let loader = Loader::new(filename,SystemTime::now());
-        let (vertices, _) = loader.parse_binary(bytestream);
-        let ans = &CUBE_VERTICES[..];
+        let loader = Loader::new(filename,SystemTime::now(), Some(1));
+        let (vertices, indices) = loader.parse_binary(bytestream);
+        let ans = &CUBE_VERTICES_DEDUPLICATED[..];
+        
         assert_eq!(vertices, ans);
+        assert_eq!(indices, &CUBE_INDICES[..]);
     }
 
     #[test]
     fn test_ascii_load() {
         let filename = "assets/cube-ascii.stl".to_string();
         let stream = fs::read_to_string(&filename).unwrap();
-        let loader = Loader::new(filename, SystemTime::now());
-        let (vertices, _) = loader.parse_ascii(stream);
-        let ans = &ASCII_CUBE_VERTICES[..];
+        let loader = Loader::new(filename, SystemTime::now(), Some(1));
+        let (vertices, indices) = loader.parse_ascii(stream);
+        let ans = &ASCII_CUBE_VERTICES_DEDUPLICATED[..];
         assert_eq!(vertices, ans);
+        assert_eq!(indices, &ASCII_CUBE_INDICES[..]);
+    }
+
+    #[test]
+    fn test_loader_run(){
+        let filename = "assets/cube.stl".to_string();
+        let loader = Loader::new(filename,SystemTime::now(), Some(1));
+        let (vertices, indices) = loader.run();
+
+        assert_eq!(vertices, &CUBE_VERTICES_DEDUPLICATED[..]);
+        assert_eq!(indices, &CUBE_INDICES[..]);
     }
 
     #[test]
