@@ -115,6 +115,11 @@ impl Camera {
         self.center = Vec3::new((xb.0 + xb.1) as f32 / 2.0,
                                 (yb.0 + yb.1) as f32 / 2.0,
                                 (zb.0 + zb.1) as f32 / 2.0);
+        
+        //Because of how stl file axes are laid out by convention, the camera begin looking at the 
+        //model from above. We want to look at in from the front. To do so, we rotate around the x-axis
+        //by 90 degrees.
+        self.orientation = glm::quat_rotate_normalized_axis(&self.orientation, -std::f32::consts::FRAC_PI_2, &Vec3::x_axis());
     }
 
 
