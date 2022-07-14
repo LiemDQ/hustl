@@ -1,8 +1,7 @@
-use itertools::Itertools;
 use nalgebra_glm as glm;
 use glm::{Vec2, Vec3, Vec4, Mat4, Quat};
 use winit::event::MouseButton;
-use crate::loader::{Vertex, ModelBounds};
+use crate::loader::{ModelBounds};
 
 #[derive(Copy, Clone, Debug)]
 enum MouseState {
