@@ -2,7 +2,7 @@ use itertools::Itertools;
 use nalgebra_glm as glm;
 use glm::{Vec2, Vec3, Vec4, Mat4, Quat};
 use winit::event::MouseButton;
-use crate::loader::Vertex;
+use crate::loader::{Vertex, ModelBounds};
 
 #[derive(Copy, Clone, Debug)]
 enum MouseState {
@@ -28,7 +28,7 @@ impl Projection {
 
 /// Camera implementation. Uses a "virtual trackball" scheme as described
 /// in [this](http://hjemmesider.diku.dk/%7Ekash/papers/DSAGM2002_henriksen.pdf) paper.
-/// 
+/// Most of the implementation was shamelessly taken from https://github.com/Formlabs/foxtrot
 pub struct Camera {
     width: f32,
     height: f32,
@@ -103,10 +103,11 @@ impl Camera {
         self.center += (self.mat_i() * delta_mouse.to_homogeneous()).xyz();
     }
 
-    pub fn fit_verts(&mut self, verts: &[Vertex]) {
-        let xb = verts.iter().map(|v| v.pos[0]).minmax().into_option().unwrap();
-        let yb = verts.iter().map(|v| v.pos[1]).minmax().into_option().unwrap();
-        let zb = verts.iter().map(|v| v.pos[2]).minmax().into_option().unwrap();
+    /// Make sure the camera view fits the model upon startup
+    pub fn fit_verts(&mut self, bounds: &ModelBounds) {
+        let xb = bounds.x;
+        let yb = bounds.y;
+        let zb = bounds.z;
         let dx = xb.1 - xb.0;
         let dy = yb.1 - yb.0;
         let dz = zb.1 - zb.0;
