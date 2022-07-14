@@ -24,12 +24,10 @@ pub struct State {
 impl State {
     pub fn new(start_time: std::time::SystemTime, model: Option<Model>, bounds: ModelBounds, size: PhysicalSize<u32>, 
              surface: wgpu::Surface, device: wgpu::Device, config: wgpu::SurfaceConfiguration) -> Self {
-      
-            
+    
         surface.configure(&device, &config);
         let background = Background::new(&device, &config);
         let depth = Model::get_depth_texture(&config, &device);
-
         
         Self { 
             start_time, 
