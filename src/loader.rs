@@ -150,7 +150,7 @@ impl Loader {
         result
     }
 
-    pub fn parse_binary(&self, bytestream: Vec<u8>) -> ModelData {
+    fn parse_binary(&self, bytestream: Vec<u8>) -> ModelData {
         
         //not sure if this approach is better than the byteorder approach, which requires a mutable borrow 
         //(and will be difficult to use in a multithreaded context.)
