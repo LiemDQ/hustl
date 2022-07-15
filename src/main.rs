@@ -3,16 +3,17 @@ mod model;
 mod camera;
 mod bg;
 mod state;
+mod color;
 
 use std::time::SystemTime;
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
-    window::Window,
+    window::Window, dpi::PhysicalSize,
 };
 use clap::Parser;
 
-use crate::loader::Loader;
+use crate::{loader::Loader, color::Theme};
 use crate::model::Model;
 use crate::state::State;
 
@@ -68,12 +69,14 @@ async fn run(start_time: SystemTime, filename: Option<String>, event_loop: Event
     let dt = device_start_time.duration_since(start_time).expect("Negative start time calculated?");
     println!("GPU startup in {:?}", dt);
 
+    let theme = Theme::Dark;
+
     let data = data_future.await.unwrap();
     let model = {
-        Some(Model::new(&device, &config, data.vertices.as_slice(), data.indices.as_slice()))
+        Some(Model::new(&device, &config,  &theme, data.vertices.as_slice(), data.indices.as_slice()))
     };
         
-    let mut state = State::new(start_time, model, data.bounds, size, surface, device, config);
+    let mut state = State::new(start_time, model, theme, data.bounds, size, surface, device, config);
 
     event_loop.run(move |event, _, control_flow|  {
         *control_flow = ControlFlow::Wait;
@@ -134,6 +137,7 @@ async fn main() {
 
     let event_loop = EventLoop::new();
     let window = Window::new(&event_loop).unwrap();
+    window.set_inner_size(PhysicalSize::new(1200, 800));
     window.set_title("hustl");
     run(start, args.filename, event_loop, window).await;
 }

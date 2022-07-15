@@ -7,6 +7,8 @@ use crate::camera::Camera;
 use crate::loader::ModelBounds;
 use crate::model::Model;
 use crate::bg::Background;
+use crate::color::Theme;
+
 pub struct State {
     pub start_time: std::time::SystemTime,
     surface: wgpu::Surface,
@@ -19,14 +21,16 @@ pub struct State {
     depth: (wgpu::Texture, wgpu::TextureView, wgpu::Sampler),
     is_first_frame: bool,
     bounds: ModelBounds,
+    theme: Theme,
 }
 
 impl State {
-    pub fn new(start_time: std::time::SystemTime, model: Option<Model>, bounds: ModelBounds, size: PhysicalSize<u32>, 
+    pub fn new(start_time: std::time::SystemTime, model: Option<Model>, theme: Theme, bounds: ModelBounds, size: PhysicalSize<u32>, 
              surface: wgpu::Surface, device: wgpu::Device, config: wgpu::SurfaceConfiguration) -> Self {
     
         surface.configure(&device, &config);
-        let background = Background::new(&device, &config);
+        
+        let background = Background::new(&device, &config, &theme);
         let depth = Model::get_depth_texture(&config, &device);
         
         Self { 
@@ -40,7 +44,8 @@ impl State {
             size,
             depth,
             background,
-            is_first_frame: true
+            is_first_frame: true,
+            theme            
         }
     }
 

@@ -3,18 +3,19 @@ use nalgebra_glm as glm;
 use glm::{Mat4};
 use crate::loader::Vertex;
 use crate::camera::Camera;
-
+use crate::color::Theme;
 pub struct Model {
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
+    color_bind_group: wgpu::BindGroup,
     render_pipeline: wgpu::RenderPipeline,
     num_indices: u32,
 }
 
 impl Model {
-    pub fn new(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration, vertices: &[Vertex], indices: &[u32]) -> Self {
+    pub fn new(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration, theme: &Theme, vertices: &[Vertex], indices: &[u32]) -> Self {
         
         println!("Polygons: {}", indices.len()/3);
 
@@ -75,11 +76,53 @@ impl Model {
             }
         );
 
+        let model_colors = theme.get_values().get_model_colors();
+
+        let color_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Background color buffer"),
+                contents: bytemuck::cast_slice(&model_colors),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            }
+        );
+
+        let color_bind_group_layout = device.create_bind_group_layout(
+            &wgpu::BindGroupLayoutDescriptor {
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer { 
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false, 
+                            min_binding_size: None, 
+                        },
+                        count: None
+                    },
+                ],
+                label: Some("Background color bind group layout"),
+            }
+        );
+
+        let color_bind_group = device.create_bind_group(
+            &wgpu::BindGroupDescriptor {
+                layout: &color_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: color_buffer.as_entire_binding(),
+                    }
+                ],
+                label: Some("Background color bind group"),
+            }
+        );
+
         let pipeline_layout = device.create_pipeline_layout(
             &wgpu::PipelineLayoutDescriptor {
                 label: Some("Model render pipeline layout"),
                 bind_group_layouts: &[
                     &camera_bind_group_layout,
+                    &color_bind_group_layout,
                 ],
                 push_constant_ranges: &[]
             }
@@ -154,6 +197,7 @@ impl Model {
             vertex_buffer,
             camera_buffer,
             camera_bind_group,
+            color_bind_group,
             num_indices: indices.len() as u32
         }
 
@@ -209,6 +253,7 @@ impl Model {
         render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
         render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
+        render_pass.set_bind_group(1, &self.color_bind_group, &[]);
         //TODO: replace with indexed draw call
         render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
     }

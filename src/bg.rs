@@ -1,11 +1,16 @@
+use crate::color::Theme;
+
 use std::borrow::Cow;
+use wgpu::util::DeviceExt;
 
 pub struct Background {
     render_pipeline: wgpu::RenderPipeline,
+    color_bind_group: wgpu::BindGroup,
 }
 
 impl Background {
-    pub fn new(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration ) -> Self {
+    pub fn new(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration, theme: &Theme ) -> Self {
+        let bg_colors = theme.get_values().get_background_colors();
 
         let shader = device.create_shader_module(
             &wgpu::ShaderModuleDescriptor {
@@ -14,10 +19,51 @@ impl Background {
             }
         );
 
+        let color_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Background color buffer"),
+                contents: bytemuck::cast_slice(&bg_colors),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            }
+        );
+
+        let color_bind_group_layout = device.create_bind_group_layout(
+            &wgpu::BindGroupLayoutDescriptor {
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::VERTEX,
+                        ty: wgpu::BindingType::Buffer { 
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false, 
+                            min_binding_size: None, 
+                        },
+                        count: None
+                    },
+                ],
+                label: Some("Background color bind group layout"),
+            }
+        );
+
+        let color_bind_group = device.create_bind_group(
+            &wgpu::BindGroupDescriptor {
+                layout: &color_bind_group_layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: color_buffer.as_entire_binding(),
+                    }
+                ],
+                label: Some("Background color bind group"),
+            }
+        );
+
         let pipeline_layout = device.create_pipeline_layout(
             &wgpu::PipelineLayoutDescriptor {
                 label: None,
-                bind_group_layouts: &[],
+                bind_group_layouts: &[
+                    &color_bind_group_layout,
+                ],
                 push_constant_ranges: &[],
             }
         );
@@ -54,7 +100,8 @@ impl Background {
         );
 
         Self { 
-            render_pipeline
+            render_pipeline,
+            color_bind_group,
         }
     }
 
@@ -89,6 +136,7 @@ impl Background {
             );
 
             render_pass.set_pipeline(&self.render_pipeline);
+            render_pass.set_bind_group(0, &self.color_bind_group, &[]);
             render_pass.draw(0..6, 0..1);
         }
         

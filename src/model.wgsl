@@ -8,6 +8,8 @@ struct CameraUniform {
 [[group(0), binding(0)]]
 var<uniform> camera: CameraUniform;
 
+
+
 struct VertexInput {
     [[location(0)]] position: vec3<f32>;
 };
@@ -25,13 +27,21 @@ fn vs_main(model: VertexInput) -> VertexOutput {
     return out;
 }
 
+struct ModelColors {
+    key: vec4<f32>;
+    fill: vec4<f32>;
+    base: vec4<f32>;
+};
+
+[[group(1), binding(0)]]
+var<uniform> colors: ModelColors;
 
 [[stage(fragment)]]
 fn fs_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
     //solarized theme, factor out into separate bind group later
-    let key = vec3<f32>(0.99, 0.96, 0.89);
-    let fill = vec3<f32>(0.92, 0.91, 0.83);
-    let base = vec3<f32>(0.20, 0.24, 0.25);
+    let key = colors.key.xyz;
+    let fill = colors.fill.xyz;
+    let base = colors.base.xyz;
     //The shading of the fragment should depend on the relative angle from the z-normal vector. 
     // This simulates a "light" emanating from the camera and from the upper right.
     
@@ -43,7 +53,7 @@ fn fs_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
 
     //determine projection of fragment normal vector onto z unit vector
     let a = dot(normal, vec3<f32>(0.0, 0.0, -1.0));
-    let b = dot(normal, vec3<f32>(-0.57, -0.57, 0.57));
+    let b = dot(normal, vec3<f32>(-0.57, -0.57, 0.0));
 
     return vec4<f32>(mix(base, key, a)* 0.3 + mix(base, fill, b) * 0.7, 1.0);
 }
