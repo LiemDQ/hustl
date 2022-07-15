@@ -15,7 +15,6 @@ env_logger = "0.9"
 log = "0.4"
 cfg-if = "1"
 bytemuck = {version = "1.5", features = ["derive"]}
-itertools = "0.10"
 ahash = "0.7"
 tokio = {version = "1", features = ["rt-multi-thread", "macros"]}
 crossbeam = "0.8"

@@ -1,7 +1,9 @@
 use std::{fs, hash::Hash};
 use ahash::AHashMap;
+use crossbeam::thread::ScopedJoinHandle;
 use std::time::SystemTime;
 use std::thread;
+
 
 const BYTES_PER_TRIANGLE: u32 = 50;
 
@@ -30,6 +32,50 @@ impl Hash for Vertex {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct ModelBounds {
+    pub x: (f32, f32), //min, max
+    pub y: (f32, f32), //min, max
+    pub z: (f32, f32), //min, max
+}
+
+impl ModelBounds {
+    fn merge_bounds(&mut self, other: &ModelBounds) {
+        self.x.0 = self.x.0.min(other.x.0);
+        self.x.1 = self.x.1.max(other.x.1);
+        self.y.0 = self.y.0.min(other.y.0);
+        self.y.1 = self.y.1.max(other.y.1);
+        self.z.0 = self.z.0.min(other.z.0);
+        self.z.1 = self.z.1.max(other.z.1);
+    }
+
+    fn update(&mut self, vertex: &Vertex) {
+        self.x.0 = self.x.0.min(vertex.pos[0]);
+        self.x.1 = self.x.1.max(vertex.pos[0]);
+        self.y.0 = self.y.0.min(vertex.pos[1]);
+        self.y.1 = self.y.1.max(vertex.pos[1]);
+        self.z.0 = self.z.0.min(vertex.pos[2]);
+        self.z.1 = self.z.1.max(vertex.pos[2]);
+    }
+}
+
+impl Default for ModelBounds {
+    fn default() -> Self {
+        //we want any value for min or max to override the default value. 
+        Self {
+            x: (f32::INFINITY, f32::NEG_INFINITY),
+            y: (f32::INFINITY, f32::NEG_INFINITY),
+            z: (f32::INFINITY, f32::NEG_INFINITY),
+        }
+    }
+}
+
+pub struct ModelData {
+    pub vertices: Vec<Vertex>,
+    pub indices: Vec<u32>,
+    pub bounds: ModelBounds,
+}
+
 pub struct Loader {
     pub filename: String,
     pub start_time: SystemTime,
@@ -41,7 +87,7 @@ impl Loader {
         Self { filename, start_time, max_workers}
     }
 
-    fn parse_ascii(&self, stream: String) -> (Vec<Vertex>, Vec<u32>) {
+    fn parse_ascii(&self, stream: String) -> ModelData {
         let floats: Vec<f32> = stream
         .split_ascii_whitespace()
         .filter_map(|s| s.parse::<f32>().ok())
@@ -76,27 +122,15 @@ impl Loader {
             }).collect();
 
             //with vector indexing we roughly estimate number of entries is divided by 6
-            let mut vertex_data = Vec::with_capacity(num_triangles as usize/2);
-            let mut indices = Vec::with_capacity(num_triangles as usize *3);
-            let mut current_index: u32 = 0;
-
-            for handle in handles {
-                let (data, idx) = handle.join().unwrap();
-
-                vertex_data.extend(&data);
-                
-                //the index numbers need to be offset based on how many entries are currently in the vertex_data vector, 
-                //since they start from 0.
-                indices.extend(idx.iter().map(|idx| *idx + current_index)); 
-                current_index = vertex_data.len() as u32;
-            }
-
-            (vertex_data, indices)
+            let vertex_data = Vec::with_capacity(num_triangles as usize/2);
+            let indices = Vec::with_capacity(num_triangles as usize *3);
+            
+            Loader::process_workers(handles.into_iter(), vertex_data, indices)
         }).unwrap()        
     }
 
 
-    pub fn run(&self) -> (Vec<Vertex>, Vec<u32>){
+    pub fn run(&self) -> ModelData {
         
         let bytestream = fs::read(&self.filename).unwrap();
         if bytestream.len() < 84 {
@@ -116,7 +150,7 @@ impl Loader {
         result
     }
 
-    pub fn parse_binary(&self, bytestream: Vec<u8>) -> (Vec<Vertex>, Vec<u32>) {
+    pub fn parse_binary(&self, bytestream: Vec<u8>) -> ModelData {
         
         //not sure if this approach is better than the byteorder approach, which requires a mutable borrow 
         //(and will be difficult to use in a multithreaded context.)
@@ -153,24 +187,33 @@ impl Loader {
             }).collect();
 
             //with vector indexing we roughly estimate number of entries is divided by 6
-            let mut vertex_data = Vec::with_capacity(num_triangles as usize/2);
-            let mut indices = Vec::with_capacity(num_triangles as usize *3);
-            let mut current_index: u32 = 0;
+            let vertex_data = Vec::with_capacity(num_triangles as usize/2);
+            let indices = Vec::with_capacity(num_triangles as usize *3);
 
-            for handle in handles {
-                let (data, idx) = handle.join().unwrap();
-
-                vertex_data.extend(&data);
-                
-                //the index numbers need to be offset based on how many entries are currently in the vertex_data vector, 
-                //since they start from 0.
-                indices.extend(idx.iter().map(|idx| *idx + current_index)); 
-                current_index = vertex_data.len() as u32;
-            }
-
-            (vertex_data, indices)
+            Loader::process_workers(handles.into_iter(), vertex_data, indices)
         }).unwrap()
     } 
+
+    fn process_workers<'scope, T>(handles: T, mut vertices: Vec<Vertex>, mut indices: Vec<u32>) -> ModelData 
+        where T: Iterator<Item = ScopedJoinHandle<'scope, ModelData>>
+    {
+        let mut current_index: u32 = 0;
+        let mut bounds = ModelBounds::default();
+
+        for handle in handles {
+            let data = handle.join().unwrap();
+
+            vertices.extend(&data.vertices);
+            
+            //the index numbers need to be offset based on how many entries are currently in the vertex_data vector, 
+            //since they start from 0.
+            indices.extend(data.indices.iter().map(|idx| *idx + current_index)); 
+            bounds.merge_bounds(&data.bounds);
+            current_index = vertices.len() as u32;
+        }
+
+        ModelData { vertices, indices, bounds}
+    }
 }
 
 /// Loader worker
@@ -187,19 +230,20 @@ impl Worker {
         Self {vertex_map: AHashMap::default(), id, triangles_per_worker}
     }
 
-    pub fn run_binary(&mut self, bytes: &[u8], n: u32) -> (Vec<Vertex>, Vec<u32>) {
+    pub fn run_binary(&mut self, bytes: &[u8], n: u32) -> ModelData {
         self.get_binary_vertices_indexed(bytes, n)
     }
 
-    pub fn run_ascii(&mut self, floats: &[f32]) -> (Vec<Vertex>, Vec<u32>){
+    pub fn run_ascii(&mut self, floats: &[f32]) -> ModelData {
         self.get_ascii_vertices_indexed(floats)
     }
     
     #[allow(dead_code)]
-    fn get_binary_vertices_unindexed(&self, bytes: &[u8], n: u32) -> (Vec<Vertex>, Vec<u32>) {
+    fn get_binary_vertices_unindexed(&self, bytes: &[u8], n: u32) -> ModelData {
         let mut i = 0;
-        let mut vertex_data = Vec::with_capacity(n as usize);
+        let mut vertices = Vec::with_capacity(n as usize);
         let mut indices = Vec::with_capacity(n as usize);
+        let mut bounds = ModelBounds::default();
 
         for triangle_data in bytes.chunks(50) {
             for n in 1..4 {
@@ -207,18 +251,20 @@ impl Worker {
                 for (data, val) in triangle_data.chunks(4).skip(n*3).zip(vertex.pos.iter_mut()) {
                     *val = f32::from_le_bytes(data.try_into().expect("Slice with incorrect length"));
                 }
-                vertex_data.push(vertex);
+                bounds.update(&vertex);
+                vertices.push(vertex);
                 indices.push(i);
                 i += 1;
             }
             //last 2 bytes are the "attribute byte count" and are ignored.
         }
-        (vertex_data, indices)
+        ModelData { vertices, indices, bounds }
     }
 
-    fn get_binary_vertices_indexed(&mut self, bytes: &[u8], n: u32) -> (Vec<Vertex>, Vec<u32>) {
-        let mut vertex_data = Vec::with_capacity(n as usize*3);
+    fn get_binary_vertices_indexed(&mut self, bytes: &[u8], n: u32) -> ModelData {
+        let mut vertices = Vec::with_capacity(n as usize*3);
         let mut indices = Vec::with_capacity(n as usize *3);
+        let mut bounds = ModelBounds::default();
         //loop over every 50 chunks. The first 36 bytes are vertex data. 
         for chunk in bytes.chunks(50) {
             
@@ -227,45 +273,54 @@ impl Worker {
                 for (data, val) in chunk.chunks(4).skip(n*3).zip(vertex.pos.iter_mut()) {
                     *val = f32::from_le_bytes(data.try_into().expect("Slice with incorrect length"));
                 }
-                let idx = self.get_vertex_index(vertex, &mut vertex_data);
+                bounds.update(&vertex);
+                let idx = self.get_vertex_index(vertex, &mut vertices);
                 indices.push(idx);
             }
            //last 2 bytes are the "attribute byte count" and are ignored.   
         }
 
-        (vertex_data, indices)
+        ModelData { vertices, indices, bounds }
     }
 
     #[allow(dead_code)]
-    fn get_ascii_vertices_unindexed(&self, floats: &[f32]) -> (Vec<Vertex>, Vec<u32>){
+    fn get_ascii_vertices_unindexed(&self, floats: &[f32]) -> ModelData {
         let mut vertices = Vec::with_capacity(floats.len()/12*3);
         let mut indices = Vec::with_capacity(floats.len()/12*3);
         let mut i = 0;
+        let mut bounds = ModelBounds::default();
+
         for triangle in floats.chunks(12) {
             for vertex in triangle[3..].chunks(3) {
-                vertices.push(Vertex { pos: vertex.try_into().expect("Slice with incorrect length")});
+                let vertex = Vertex { pos: vertex.try_into().expect("Slice with incorrect length")};
+                bounds.update(&vertex);
+                vertices.push(vertex);
                 indices.push(i);
                 i += 1;
             }
         }
 
-        (vertices, indices)
+        ModelData { vertices, indices, bounds }
     }
 
-    fn get_ascii_vertices_indexed(&mut self, floats: &[f32]) -> (Vec<Vertex>, Vec<u32>){
+    fn get_ascii_vertices_indexed(&mut self, floats: &[f32]) -> ModelData {
         let mut vertices = Vec::with_capacity(floats.len()/12*3);
         let mut indices = Vec::with_capacity(floats.len()/12*3);
+        let mut bounds = ModelBounds::default();
+
         for triangle in floats.chunks(12) {
             for vertex in triangle[3..].chunks(3) {
+                let vertex = Vertex { pos: vertex.try_into().expect("Slice with incorrect length")};
+                bounds.update(&vertex);
                 let idx = self.get_vertex_index(
-                    Vertex { pos: vertex.try_into().expect("Slice with incorrect length")},
+                    vertex,
                     &mut vertices
                 );
                 indices.push(idx)
             }
         }
 
-        (vertices, indices)
+        ModelData { vertices, indices, bounds }
     }
 
     fn get_vertex_index(&mut self, vertex: Vertex, vector: &mut Vec<Vertex>) -> u32 {
@@ -445,11 +500,11 @@ mod test {
 
         let bytestream = fs::read(&filename).unwrap();
         let loader = Loader::new(filename,SystemTime::now(), Some(1));
-        let (vertices, indices) = loader.parse_binary(bytestream);
+        let data = loader.parse_binary(bytestream);
         let ans = &CUBE_VERTICES_DEDUPLICATED[..];
         
-        assert_eq!(vertices, ans);
-        assert_eq!(indices, &CUBE_INDICES[..]);
+        assert_eq!(data.vertices, ans);
+        assert_eq!(data.indices, &CUBE_INDICES[..]);
     }
 
     #[test]
@@ -457,20 +512,20 @@ mod test {
         let filename = "assets/cube-ascii.stl".to_string();
         let stream = fs::read_to_string(&filename).unwrap();
         let loader = Loader::new(filename, SystemTime::now(), Some(1));
-        let (vertices, indices) = loader.parse_ascii(stream);
+        let data = loader.parse_ascii(stream);
         let ans = &ASCII_CUBE_VERTICES_DEDUPLICATED[..];
-        assert_eq!(vertices, ans);
-        assert_eq!(indices, &ASCII_CUBE_INDICES[..]);
+        assert_eq!(data.vertices, ans);
+        assert_eq!(data.indices, &ASCII_CUBE_INDICES[..]);
     }
 
     #[test]
     fn test_loader_run(){
         let filename = "assets/cube.stl".to_string();
         let loader = Loader::new(filename,SystemTime::now(), Some(1));
-        let (vertices, indices) = loader.run();
+        let data = loader.run();
 
-        assert_eq!(vertices, &CUBE_VERTICES_DEDUPLICATED[..]);
-        assert_eq!(indices, &CUBE_INDICES[..]);
+        assert_eq!(data.vertices, &CUBE_VERTICES_DEDUPLICATED[..]);
+        assert_eq!(data.indices, &CUBE_INDICES[..]);
     }
 
     #[test]
@@ -480,9 +535,9 @@ mod test {
         let bytes = &bytestream[84..];
         let num_triangles = bytes.len() as u32/BYTES_PER_TRIANGLE ;
         let worker = Worker::new(0, num_triangles);
-        let (vertices, _) = worker.get_binary_vertices_unindexed(bytes, num_triangles*3);
+        let data = worker.get_binary_vertices_unindexed(bytes, num_triangles*3);
 
-        assert_eq!(vertices, &CUBE_VERTICES[..]);
+        assert_eq!(data.vertices, &CUBE_VERTICES[..]);
     }
 
     #[test]
@@ -492,10 +547,10 @@ mod test {
         let bytes = &bytestream[84..];
         let num_triangles = bytes.len() as u32/BYTES_PER_TRIANGLE ;
         let mut worker = Worker::new(0, num_triangles);
-        let (vertices, indices) = worker.get_binary_vertices_indexed(bytes, num_triangles*3);
+        let data = worker.get_binary_vertices_indexed(bytes, num_triangles*3);
 
-        assert_eq!(vertices, &CUBE_VERTICES_DEDUPLICATED[..]);
-        assert_eq!(indices, &CUBE_INDICES[..]);
+        assert_eq!(data.vertices, &CUBE_VERTICES_DEDUPLICATED[..]);
+        assert_eq!(data.indices, &CUBE_INDICES[..]);
     }
 
     #[test]
@@ -510,10 +565,10 @@ mod test {
         let num_triangles = (floats.len()/12) as u32;
 
         let worker = Worker::new(0, num_triangles);
-        let (vertices, _) = worker.get_ascii_vertices_unindexed(floats.as_slice());
+        let data = worker.get_ascii_vertices_unindexed(floats.as_slice());
         let ans = &ASCII_CUBE_VERTICES[..];
 
-        assert_eq!(vertices, ans);
+        assert_eq!(data.vertices, ans);
     }
 
     #[test]
@@ -528,10 +583,10 @@ mod test {
         let num_triangles = (floats.len()/12) as u32;
 
         let mut worker = Worker::new(0, num_triangles);
-        let (vertices, indices) = worker.get_ascii_vertices_indexed(floats.as_slice());
+        let data = worker.get_ascii_vertices_indexed(floats.as_slice());
         let ans = &ASCII_CUBE_VERTICES_DEDUPLICATED[..];
 
-        assert_eq!(vertices, ans);
-        assert_eq!(indices, &ASCII_CUBE_INDICES[..]);
+        assert_eq!(data.vertices, ans);
+        assert_eq!(data.indices, &ASCII_CUBE_INDICES[..]);
     }
 }

@@ -1,8 +1,7 @@
-use itertools::Itertools;
 use nalgebra_glm as glm;
 use glm::{Vec2, Vec3, Vec4, Mat4, Quat};
 use winit::event::MouseButton;
-use crate::loader::Vertex;
+use crate::loader::{ModelBounds};
 
 #[derive(Copy, Clone, Debug)]
 enum MouseState {
@@ -28,7 +27,7 @@ impl Projection {
 
 /// Camera implementation. Uses a "virtual trackball" scheme as described
 /// in [this](http://hjemmesider.diku.dk/%7Ekash/papers/DSAGM2002_henriksen.pdf) paper.
-/// 
+/// Most of the implementation was shamelessly taken from https://github.com/Formlabs/foxtrot
 pub struct Camera {
     width: f32,
     height: f32,
@@ -103,10 +102,11 @@ impl Camera {
         self.center += (self.mat_i() * delta_mouse.to_homogeneous()).xyz();
     }
 
-    pub fn fit_verts(&mut self, verts: &[Vertex]) {
-        let xb = verts.iter().map(|v| v.pos[0]).minmax().into_option().unwrap();
-        let yb = verts.iter().map(|v| v.pos[1]).minmax().into_option().unwrap();
-        let zb = verts.iter().map(|v| v.pos[2]).minmax().into_option().unwrap();
+    /// Make sure the camera view fits the model upon startup
+    pub fn fit_verts(&mut self, bounds: &ModelBounds) {
+        let xb = bounds.x;
+        let yb = bounds.y;
+        let zb = bounds.z;
         let dx = xb.1 - xb.0;
         let dy = yb.1 - yb.0;
         let dz = zb.1 - zb.0;
@@ -114,6 +114,11 @@ impl Camera {
         self.center = Vec3::new((xb.0 + xb.1) as f32 / 2.0,
                                 (yb.0 + yb.1) as f32 / 2.0,
                                 (zb.0 + zb.1) as f32 / 2.0);
+        
+        //Because of how stl file axes are laid out by convention, the camera begin looking at the 
+        //model from above. We want to look at in from the front. To do so, we rotate around the x-axis
+        //by 90 degrees.
+        self.orientation = glm::quat_rotate_normalized_axis(&self.orientation, -std::f32::consts::FRAC_PI_2, &Vec3::x_axis());
     }
 
 

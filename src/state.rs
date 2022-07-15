@@ -4,6 +4,7 @@ use winit::dpi::PhysicalSize;
 use winit::event::{DeviceEvent, MouseScrollDelta, WindowEvent, ElementState};
 
 use crate::camera::Camera;
+use crate::loader::ModelBounds;
 use crate::model::Model;
 use crate::bg::Background;
 pub struct State {
@@ -17,17 +18,16 @@ pub struct State {
     background: Background,
     depth: (wgpu::Texture, wgpu::TextureView, wgpu::Sampler),
     is_first_frame: bool,
+    bounds: ModelBounds,
 }
 
 impl State {
-    pub fn new(start_time: std::time::SystemTime, model: Option<Model>, size: PhysicalSize<u32>, 
+    pub fn new(start_time: std::time::SystemTime, model: Option<Model>, bounds: ModelBounds, size: PhysicalSize<u32>, 
              surface: wgpu::Surface, device: wgpu::Device, config: wgpu::SurfaceConfiguration) -> Self {
-      
-            
+    
         surface.configure(&device, &config);
         let background = Background::new(&device, &config);
         let depth = Model::get_depth_texture(&config, &device);
-
         
         Self { 
             start_time, 
@@ -36,6 +36,7 @@ impl State {
             device,
             camera: Camera::new(size.width as f32, size.height as f32), 
             model,
+            bounds,
             size,
             depth,
             background,
@@ -63,6 +64,7 @@ impl State {
 
         if self.model.is_some() && self.is_first_frame {
             let end = std::time::SystemTime::now();
+            self.camera.fit_verts(&self.bounds);
             let dt = end.duration_since(self.start_time).expect("Negative startup time calculated?!");
             println!("First render in {:?}", dt);
             self.is_first_frame = false;

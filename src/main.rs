@@ -68,12 +68,12 @@ async fn run(start_time: SystemTime, filename: Option<String>, event_loop: Event
     let dt = device_start_time.duration_since(start_time).expect("Negative start time calculated?");
     println!("GPU startup in {:?}", dt);
 
+    let data = data_future.await.unwrap();
     let model = {
-        let data = data_future.await.unwrap();
-        Some(Model::new(&device, &config, data.0.as_slice(), data.1.as_slice()))
+        Some(Model::new(&device, &config, data.vertices.as_slice(), data.indices.as_slice()))
     };
         
-    let mut state = State::new(start_time, model, size, surface, device, config);
+    let mut state = State::new(start_time, model, data.bounds, size, surface, device, config);
 
     event_loop.run(move |event, _, control_flow|  {
         *control_flow = ControlFlow::Wait;
